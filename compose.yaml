@@ -4,14 +4,14 @@ services:
   server:
     build:
       context: .
-      dockerfile: server.Dockerfile
+      dockerfile: Dockerfile.client
     ports:
       - "8081:8081"
 
   client:
     build:
       context: .
-      dockerfile: client.Dockerfile
+      dockerfile: Dockerfile.server
     ports:
       - "8080:8080"
     depends_on:
