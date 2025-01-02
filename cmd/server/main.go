@@ -13,7 +13,7 @@ func main() {
 	message := utils.Hello("server")
 	fmt.Println(message)
 
-	_, err := config.Parse_config("taskmaster.tom")
+	_, err := config.Parse_config("taskmaster.toml")
 
 	if (err != nil) {
 		panic(err)
