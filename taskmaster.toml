@@ -1,0 +1,5 @@
+[program.one]
+command = "tail -f"
+
+[program.two]
+command = "cat"
