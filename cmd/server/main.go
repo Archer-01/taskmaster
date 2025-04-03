@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/Archer-01/taskmaster/internal/utils"
@@ -14,9 +15,9 @@ func main() {
 	fmt.Println(message)
 
 	_, err := config.Parse_config("taskmaster.toml")
-
-	if (err != nil) {
-		panic(err)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal: %s\n", err)
+		os.Exit(1)
 	}
 
 	for {
