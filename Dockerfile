@@ -3,7 +3,7 @@ FROM golang:1.23.4
 WORKDIR /app
 
 COPY go.mod go.sum ./
-RUN go mod tidy
+RUN go mod download
 
 COPY . .
 RUN go build -o /usr/local/bin/taskmasterd cmd/server/main.go
