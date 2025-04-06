@@ -76,6 +76,9 @@ func validate_struct(v reflect.Value, path []string, md toml.MetaData) error {
 		field_value := v.Field(i)
 		tag := v.Type().Field(i).Tag.Get("validate")
 		toml_tag := v.Type().Field(i).Tag.Get("toml")
+		if toml_tag == "" {
+			toml_tag = field_name
+		}
 		path := append(path, toml_tag)
 		if tag != "" {
 			rules := strings.Split(tag, ",")
