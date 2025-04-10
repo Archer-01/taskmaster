@@ -1,5 +1,5 @@
 [program.one]
-# command = "tail -f"
+command = "ping localhost"
 
 [program.two]
-command = "cat"
+command = "ping 127.0.0.1"

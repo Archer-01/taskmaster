@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -18,6 +19,12 @@ type Program struct {
 
 type Config struct {
 	Programs map[string]*Program `toml:"program"`
+}
+
+func ParseCommand(cmd string) []string {
+	return strings.FieldsFunc(cmd, func(r rune) bool {
+		return strings.ContainsRune(" \t\n\v\f\r", r)
+	})
 }
 
 func Parse_config(file string) (Config, error) {
