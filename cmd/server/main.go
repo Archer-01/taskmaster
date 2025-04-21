@@ -3,12 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
+	"sync"
 
 	"github.com/Archer-01/taskmaster/internal/manager"
-	"github.com/Archer-01/taskmaster/internal/parser/config"
+	"github.com/Archer-01/taskmaster/internal/server"
 	"github.com/Archer-01/taskmaster/internal/utils"
 )
 
@@ -16,42 +14,32 @@ func main() {
 	message := utils.Hello("server")
 	fmt.Println(message)
 
-	var ins *manager.JobManager
+	setup, err := utils.ParseSetupFile()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	reload := make(chan os.Signal, 1)
-	signal.Notify(reload, syscall.SIGHUP)
+	Manager := manager.NewJobManager(setup.Config)
+	err = Manager.Init()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	go func() {
-		for {
-			conf, err := config.Parse_config("taskmaster.toml")
-			if err != nil {
-				log.Fatalln("Fatal:", err)
-			}
+	Server := server.NewServer(setup.Socket, Manager)
+	err = Server.Init()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-			ins = manager.Init(conf)
-			fmt.Println(os.Getpid())
+	var wg sync.WaitGroup
+	defer wg.Wait()
 
-			ins.Start()
+	Manager.InitSignals()
+	go Manager.WaitForSignals(&wg)
+	defer Manager.StopSignals()
 
-			<-reload
-			ins.Finish()
-		}
-	}()
+	go Server.Start(&wg)
+	defer Server.Stop()
 
-	sigs := make(chan os.Signal, 1)
-
-	signal.Notify(sigs, syscall.SIGQUIT)
-
-	done := make(chan bool, 1)
-
-	go func() {
-		sig := <-sigs
-		fmt.Fprintf(os.Stdout, "\nCaught signal: '%s'\n", sig)
-		ins.Finish()
-		done <- true
-	}()
-
-	fmt.Println("Waiting for Ctrl-C")
-	<-done
-	fmt.Println("exiting")
+	Manager.Run()
 }

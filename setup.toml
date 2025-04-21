@@ -1,0 +1,2 @@
+socket = "/tmp/taskmaster.sock"
+prompt = "taskmaster> "
