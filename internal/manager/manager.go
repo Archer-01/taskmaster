@@ -6,36 +6,107 @@ import (
 
 	"github.com/Archer-01/taskmaster/internal/job"
 	"github.com/Archer-01/taskmaster/internal/parser/config"
+	"github.com/Archer-01/taskmaster/internal/utils"
 )
 
-type JobManager struct {
-	Jobs []*job.Job
+const (
+	QUIT   = "quit"
+	RELOAD = "reload"
+)
+
+type Action struct {
+	t string
 }
 
-func Init(conf config.Config) *JobManager {
-	var manager JobManager
-	var jobs []*job.Job
+type JobManager struct {
+	Jobs    []*job.Job
+	Config  string
+	actions chan string
+	sigs    chan os.Signal
+}
 
+func NewJobManager(path string) *JobManager {
+	return &JobManager{
+		Config:  path,
+		actions: make(chan string, 1),
+	}
+}
+
+func (m *JobManager) Init() error {
+	conf, err := config.ParseConfig(m.Config)
+	if err != nil {
+		return err
+	}
+
+	var jobs []*job.Job
 	for name, prog := range conf.Programs {
 		jobs = append(jobs, job.NewJob(name, prog))
 	}
 
-	manager.Jobs = jobs
-	return &manager
+	m.Jobs = jobs
+	return nil
 }
 
-func (ins *JobManager) Start() {
-	for _, j := range ins.Jobs {
-		j.StartJob()
-	}
-}
+func (m *JobManager) start() {
+	for _, j := range m.Jobs {
 
-func (ins *JobManager) Finish() {
-	for _, j := range ins.Jobs {
-		fmt.Fprintf(os.Stdout, "Exiting [%s]\n", j.Name)
-		err := j.Command.Process.Kill()
+		err := j.StartJob()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+			utils.Errorf(err.Error())
 		}
 	}
+}
+
+func (m *JobManager) Execute(action string, args ...string) error {
+	switch action {
+	case QUIT:
+		m.actions <- QUIT
+	case RELOAD:
+		m.actions <- RELOAD
+	default:
+		return fmt.Errorf("%s Unknown command", action)
+	}
+	return nil
+}
+
+func (m *JobManager) Run() {
+	m.start()
+	for {
+		action := <-m.actions
+		switch action {
+
+		case QUIT:
+			m.stop()
+			m.finish()
+			return
+
+		case RELOAD:
+			m.reload()
+
+		}
+	}
+}
+
+func (m *JobManager) stop() {
+	for _, j := range m.Jobs {
+		utils.Logf("Exiting [%s]", j.Name)
+
+		err := j.Stop()
+		if err != nil {
+			utils.Errorf(err.Error())
+		}
+	}
+}
+
+func (m *JobManager) finish() {
+	close(m.actions)
+}
+
+func (m *JobManager) reload() {
+	m.stop()
+
+	m.Init()
+	fmt.Println(os.Getpid())
+
+	m.start()
 }
