@@ -47,6 +47,10 @@ var schemaFunctions = map[string]func(string, string, reflect.Value) (bool, stri
 	ENUM: handleEnum,
 }
 
+func Validate(val any, md toml.MetaData) error {
+	return validate(reflect.ValueOf(val), []string{}, md)
+}
+
 func validate(v reflect.Value, path []string, md toml.MetaData) error {
 	if v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface {
 		v = v.Elem()

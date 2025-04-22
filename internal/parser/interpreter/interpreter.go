@@ -2,26 +2,34 @@ package interpreter
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
-func Parse(line string) {
+const (
+	EXIT    = "exit"
+	RELOAD  = "reload"
+	RESTART = "restart"
+	START   = "start"
+	STATUS  = "status"
+	STOP    = "stop"
+	QUIT    = "quit"
+)
+
+func Parse(line string) []string {
 	args := strings.Split(line, " ")
 
 	switch args[0] {
 	case "":
-		return
+		return make([]string, 0)
 
-	case "exit":
+	case EXIT:
 		fmt.Print("\n")
-		os.Exit(0)
 
-	case "reload", "restart", "start", "status", "stop":
+	case RELOAD, RESTART, START, STATUS, STOP, QUIT:
 		fmt.Printf("Running '%v'\n", args[0])
 
 	default:
 		fmt.Printf("*** Unknown syntax: %v\n", args[0])
-		os.Exit(1)
 	}
+	return args
 }

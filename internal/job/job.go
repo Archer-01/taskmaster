@@ -1,7 +1,6 @@
 package job
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
@@ -24,13 +23,19 @@ func NewJob(name string, prog *config.Program) *Job {
 	}
 }
 
-func (job *Job) StartJob() {
-	job.Command.Stdout = os.Stdout
-	job.Command.Stderr = os.Stderr
-	job.Command.Dir = job.Dir
+func (j *Job) StartJob() error {
+	j.Command.Stdout = os.Stdout
+	j.Command.Stderr = os.Stderr
+	j.Command.Dir = j.Dir
 
-	if err := job.Command.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-		return
+	err := j.Command.Start()
+	if err != nil {
+		return err
 	}
+
+	return nil
+}
+
+func (j *Job) Stop() error {
+	return j.Command.Process.Kill()
 }

@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -28,12 +27,12 @@ func ParseCommand(cmd string) []string {
 	})
 }
 
-func Parse_config(file string) (Config, error) {
+func ParseConfig(file string) (Config, error) {
 	var conf Config
 
 	mdata, err := toml.DecodeFile(file, &conf)
 
-	err_msg := validate(reflect.ValueOf(&conf), []string{}, mdata)
+	err_msg := Validate(&conf, mdata)
 	if err_msg != nil {
 		return conf, err_msg
 	}
