@@ -5,28 +5,51 @@ import (
 	"os/exec"
 
 	"github.com/Archer-01/taskmaster/internal/parser/config"
+	"github.com/Archer-01/taskmaster/internal/utils"
 )
 
 type Job struct {
-	Name    string
-	Command *exec.Cmd
+	Name          string
+	Command       *exec.Cmd
+	StdoutLogFile string
+	StderrLogFile string
 }
 
 func NewJob(name string, prog *config.Program) *Job {
-	var job Job
-
-	job.Name = name
-
 	cmd_list := config.ParseCommand(prog.Command)
 
-	job.Command = exec.Command(cmd_list[0], cmd_list[1:]...)
-
-	return &job
+	return &Job{
+		Name:          name,
+		Command:       exec.Command(cmd_list[0], cmd_list[1:]...),
+		StdoutLogFile: prog.StdoutLogFile,
+		StderrLogFile: prog.StderrLogFile,
+	}
 }
 
 func (j *Job) StartJob() error {
-	j.Command.Stdout = os.Stdout
-	j.Command.Stderr = os.Stderr
+	if j.StdoutLogFile != "" {
+		file, err := utils.OpenLogFile(j.StdoutLogFile)
+
+		if err != nil {
+			utils.Errorf(err.Error())
+		}
+
+		j.Command.Stdout = file
+	} else {
+		j.Command.Stdout = os.Stdout
+	}
+
+	if j.StderrLogFile != "" {
+		file, err := utils.OpenLogFile(j.StderrLogFile)
+
+		if err != nil {
+			utils.Errorf(err.Error())
+		}
+
+		j.Command.Stderr = file
+	} else {
+		j.Command.Stderr = os.Stderr
+	}
 
 	err := j.Command.Start()
 	if err != nil {
