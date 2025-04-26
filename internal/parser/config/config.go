@@ -8,12 +8,13 @@ import (
 )
 
 type Program struct {
-	Command   string `toml:"command" validate:"required"`
-	Autostart bool   `toml:"autostart" validate:"default=true"`
-	// Autorestart   string `toml:"autorestart"`
-	NumProcs int `toml:"numprocs" validate:"default=1,min=1"`
-	// StdoutLogFile string `toml:"stdout_logfile`
-	// StderrLogFile string `toml:"stderr_logfile"`
+	Command       string   `toml:"command" validate:"required"`
+	Autostart     bool     `toml:"autostart" validate:"default=true"`
+	NumProcs      int      `toml:"numprocs" validate:"default=1,min=1"`
+	Environment   []string `toml:"environment"`
+	Directory     string   `toml:"directory"`
+	StdoutLogFile string   `toml:"stdout_logfile"`
+	StderrLogFile string   `toml:"stderr_logfile"`
 	Umask string `toml:"umask" validate:"default=0022"`
 }
 
