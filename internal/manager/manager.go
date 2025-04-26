@@ -49,6 +49,9 @@ func (m *JobManager) Init() error {
 
 func (m *JobManager) start() {
 	for _, j := range m.Jobs {
+		if !j.Autostart {
+			continue
+		}
 
 		err := j.StartJob()
 		if err != nil {
@@ -89,6 +92,13 @@ func (m *JobManager) Run() {
 
 func (m *JobManager) stop() {
 	for _, j := range m.Jobs {
+		// HACK: This is a temporary fix
+		// Jobs should have a state (Started, Stopped, Running, ...etc)
+		// and that status must be checked before trying to finish a job
+		if !j.Autostart {
+			continue
+		}
+
 		utils.Logf("Exiting [%s]", j.Name)
 
 		err := j.Stop()
