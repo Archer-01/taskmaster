@@ -15,6 +15,7 @@ type Program struct {
 	// StdoutLogFile string `toml:"stdout_logfile`
 	// StderrLogFile string `toml:"stderr_logfile"`
 	Environment []string `toml:"environment"`
+	Directory   string   `toml:"directory"`
 }
 
 type Config struct {
