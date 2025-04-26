@@ -8,8 +8,9 @@ import (
 )
 
 type Job struct {
-	Name      string
-	Command   *exec.Cmd
+	Name    string
+	Command *exec.Cmd
+	Dir     string
 	Autostart bool
 }
 
@@ -19,6 +20,7 @@ func NewJob(name string, prog *config.Program) *Job {
 	return &Job{
 		Name: name,
 		Command: exec.Command(cmd_list[0], cmd_list[1:]...),
+		Dir: prog.Directory,
 		Autostart: prog.Autostart,
 	}
 }
@@ -26,6 +28,7 @@ func NewJob(name string, prog *config.Program) *Job {
 func (j *Job) StartJob() error {
 	j.Command.Stdout = os.Stdout
 	j.Command.Stderr = os.Stderr
+	j.Command.Dir = j.Dir
 
 	err := j.Command.Start()
 	if err != nil {
