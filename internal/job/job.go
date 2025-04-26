@@ -11,6 +11,7 @@ type Job struct {
 	Name    string
 	Command *exec.Cmd
 	Dir     string
+	Autostart bool
 }
 
 func NewJob(name string, prog *config.Program) *Job {
@@ -20,6 +21,7 @@ func NewJob(name string, prog *config.Program) *Job {
 		Name: name,
 		Command: exec.Command(cmd_list[0], cmd_list[1:]...),
 		Dir: prog.Directory,
+		Autostart: prog.Autostart,
 	}
 }
 
