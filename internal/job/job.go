@@ -9,8 +9,11 @@ import (
 )
 
 type Job struct {
-	Name          string
-	Command       *exec.Cmd
+	Name        string
+	Command     *exec.Cmd
+	Environment []string
+	Dir     string
+	Autostart bool
 	StdoutLogFile string
 	StderrLogFile string
 }
@@ -19,8 +22,11 @@ func NewJob(name string, prog *config.Program) *Job {
 	cmd_list := config.ParseCommand(prog.Command)
 
 	return &Job{
-		Name:          name,
-		Command:       exec.Command(cmd_list[0], cmd_list[1:]...),
+		Name: name,
+		Command: exec.Command(cmd_list[0], cmd_list[1:]...),
+		Dir: prog.Directory,
+		Autostart: prog.Autostart,
+		Environment: prog.Environment,
 		StdoutLogFile: prog.StdoutLogFile,
 		StderrLogFile: prog.StderrLogFile,
 	}
@@ -50,6 +56,9 @@ func (j *Job) StartJob() error {
 	} else {
 		j.Command.Stderr = os.Stderr
 	}
+
+	j.Command.Env = j.Environment
+	j.Command.Dir = j.Dir
 
 	err := j.Command.Start()
 	if err != nil {
