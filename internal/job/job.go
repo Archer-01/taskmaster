@@ -1,6 +1,7 @@
 package job
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -10,18 +11,21 @@ import (
 type Job struct {
 	Name    string
 	Command *exec.Cmd
+	Umask   string
 }
 
 func NewJob(name string, prog *config.Program) *Job {
-	var job Job
+	cmd_list := []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("umask %v && %v", prog.Umask, prog.Command),
+	}
 
-	job.Name = name
-
-	cmd_list := config.ParseCommand(prog.Command)
-
-	job.Command = exec.Command(cmd_list[0], cmd_list[1:]...)
-
-	return &job
+	return &Job{
+		Name:    name,
+		Command: exec.Command(cmd_list[0], cmd_list[1:]...),
+		Umask:   prog.Umask,
+	}
 }
 
 func (j *Job) StartJob() error {
