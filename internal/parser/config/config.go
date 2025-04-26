@@ -14,7 +14,8 @@ type Program struct {
 	NumProcs int `toml:"numprocs" validate:"default=1,min=1"`
 	// StdoutLogFile string `toml:"stdout_logfile`
 	// StderrLogFile string `toml:"stderr_logfile"`
-	Directory string `toml:"directory"`
+	Environment []string `toml:"environment"`
+	Directory   string   `toml:"directory"`
 }
 
 type Config struct {
