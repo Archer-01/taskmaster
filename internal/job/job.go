@@ -64,7 +64,7 @@ func (j *Job) StartJob() error {
 		j.Command.Stderr = os.Stderr
 	}
 
-	j.Command.Env = j.Environment
+	j.Command.Env = append(j.Environment, os.Environ()...)
 	j.Command.Dir = j.Dir
 
 	err := j.Command.Start()
