@@ -30,7 +30,7 @@ func NewJob(name string, prog *config.Program) *Job {
 func (j *Job) StartJob() error {
 	j.Command.Stdout = os.Stdout
 	j.Command.Stderr = os.Stderr
-	j.Command.Env = j.Environment
+	j.Command.Env = append(j.Environment, os.Environ()...)
 	j.Command.Dir = j.Dir
 
 	err := j.Command.Start()
