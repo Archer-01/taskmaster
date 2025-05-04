@@ -6,7 +6,6 @@ import (
 )
 
 const (
-	EXIT    = "exit"
 	RELOAD  = "reload"
 	RESTART = "restart"
 	START   = "start"
@@ -15,21 +14,18 @@ const (
 	QUIT    = "quit"
 )
 
-func Parse(line string) []string {
+func Parse(line string) ([]string, error) {
 	args := strings.Split(line, " ")
 
+	if len(args) == 0 {
+		return make([]string, 0), nil
+	}
+
 	switch args[0] {
-	case "":
-		return make([]string, 0)
-
-	case EXIT:
-		fmt.Print("\n")
-
 	case RELOAD, RESTART, START, STATUS, STOP, QUIT:
-		fmt.Printf("Running '%v'\n", args[0])
+		return args, nil
 
 	default:
-		fmt.Printf("*** Unknown syntax: %v\n", args[0])
+		return nil, fmt.Errorf("*** Unknown syntax: %v", args[0])
 	}
-	return args
 }

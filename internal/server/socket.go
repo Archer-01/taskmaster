@@ -56,7 +56,7 @@ func (_sv *Server) handleConnection(del byte, s *Socket, wg *sync.WaitGroup) {
 			}
 
 			if er != nil {
-				utils.Errorf("Server: %s", er)
+				utils.Errorf("[SERVER]: %s", er.Error())
 			}
 
 			line, err := s.Rd.ReadString(del)
@@ -83,9 +83,11 @@ func (_sv *Server) handleConnection(del byte, s *Socket, wg *sync.WaitGroup) {
 				s.Con.Write([]byte(err.Error()))
 			}
 
-			err = _sv.JobManager.Execute(cmd, args...)
-			if err != nil {
-				s.Con.Write([]byte(err.Error()))
+			res := _sv.j.Execute(cmd, args...)
+			if res.Err != nil {
+				s.Con.Write([]byte(res.Err.Error() + string(del)))
+			} else {
+				s.Con.Write([]byte(res.Data + string(del)))
 			}
 		}
 	}
