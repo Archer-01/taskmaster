@@ -179,6 +179,8 @@ func (j *Job) Restart(wg *sync.WaitGroup) {
 	}
 	if j.running {
 		go j.restartJobWorker(wg)
+	} else {
+		j.Start(wg)
 	}
 }
 
