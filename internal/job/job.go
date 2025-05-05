@@ -211,7 +211,7 @@ func (j *Job) Stop() {
 	}
 	if j.Is(RUNNING) {
 		j.SetState(STOPPING)
-		err := syscall.Kill(-j.cmd.Process.Pid, syscall.SIGINT)
+		err := syscall.Kill(-j.cmd.Process.Pid, j.StopSignal)
 		if err != nil {
 			utils.Errorf(err.Error())
 		}
