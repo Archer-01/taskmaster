@@ -13,10 +13,6 @@ import (
 	"github.com/chzyer/readline"
 )
 
-const (
-	EXIT = "exit"
-)
-
 func main() {
 	setup, err := utils.ParseSetupFile()
 	if err != nil {
@@ -59,7 +55,7 @@ func main() {
 		if len(args) == 0 {
 			continue
 		}
-		if args[0] == EXIT {
+		if args[0] == interpreter.EXIT {
 			return
 		}
 

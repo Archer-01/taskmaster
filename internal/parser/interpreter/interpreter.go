@@ -12,6 +12,7 @@ const (
 	STATUS  = "status"
 	STOP    = "stop"
 	QUIT    = "quit"
+	EXIT    = "exit"
 )
 
 func Parse(line string) ([]string, error) {
@@ -22,7 +23,13 @@ func Parse(line string) ([]string, error) {
 	}
 
 	switch args[0] {
-	case RELOAD, RESTART, START, STATUS, STOP, QUIT:
+	case RESTART, START, STATUS, STOP:
+		return args, nil
+
+	case RELOAD, QUIT, EXIT:
+		if len(args) != 1 {
+			return nil, fmt.Errorf("%s must not take arguments", args[0])
+		}
 		return args, nil
 
 	default:
