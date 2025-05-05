@@ -5,10 +5,12 @@ stdout_logfile = "one.log"
 # autostart = false
 
 [program.two]
-command = "ping 127.0.0.1"
+command = "sleep 3"
 stopsignal = "INT"
 stdout_logfile = "two.log"
 # autostart = false
+startsecs = 5
+startretries = 10
 
 [program.three]
 # autostart = false

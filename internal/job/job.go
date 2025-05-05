@@ -88,6 +88,7 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup) {
 			if j.StartRetries == retries {
 				break
 			}
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
@@ -105,6 +106,7 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup) {
 			if j.StartRetries == retries {
 				break
 			}
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
