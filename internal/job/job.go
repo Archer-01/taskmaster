@@ -28,9 +28,9 @@ type Job struct {
 	Autorestart   string
 	ExitCodes     []int
 	StopSignal    syscall.Signal
-	running       bool
-	restarting    bool
-	stopping      bool
+	StopWaitSecs  int
+	_running      bool
+	_restarting   bool
 }
 
 func NewJob(name string, prog *config.Program) *Job {
@@ -45,6 +45,7 @@ func NewJob(name string, prog *config.Program) *Job {
 	if !has_zero {
 		exit_codes = append(exit_codes, 0)
 	}
+
 	return &Job{
 		Name:          name,
 		Command:       prog.Command,
@@ -60,23 +61,39 @@ func NewJob(name string, prog *config.Program) *Job {
 		Autorestart:   prog.Autorestart,
 		ExitCodes:     exit_codes,
 		StopSignal:    utils.ParseSignal(prog.StopSignal),
-		running:       false,
-		stopping:      false,
+		StopWaitSecs:  prog.StopWaitSecs,
+		_running:      false,
+		_restarting:   false,
 	}
 }
 
-func (j *Job) Start(wg *sync.WaitGroup) {
-	if j.running {
+func (j *Job) Start(wg *sync.WaitGroup, _done chan bool) {
+	defer func() { _done <- true }()
+	if j.Is(STOPPING) || j._running {
 		return
 	}
-	go j.startJobWorker(wg)
+	j._running = true
+	done := make(chan bool, 1)
+	defer close(done)
+	go j.startJobWorker(wg, done)
+	<-done
 }
 
-func (j *Job) startJobWorker(wg *sync.WaitGroup) {
+func (j *Job) startJobWorker(wg *sync.WaitGroup, done chan bool) {
 	wg.Add(1)
 	defer wg.Done()
 
-	j.running = true
+	cmd_list := []string{
+		"sh",
+		"-c",
+		fmt.Sprintf("umask %v && %v", j.Umask, j.Command),
+	}
+
+	cmd := exec.Command(cmd_list[0], cmd_list[1:]...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	j.cmd = cmd
+
 	retries := 0
 	for {
 		j.SetState(STARTING)
@@ -94,11 +111,11 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup) {
 
 		cur_ts := int(time.Now().Unix())
 		j.SetState(RUNNING)
+		done <- true
 		state, _ := j.cmd.Process.Wait()
 		j.cmd.ProcessState = state
 
-		if j.State == STOPPING {
-			j.SetState(STOPPED)
+		if j.Is(STOPPING) {
 			break
 		} else if int(time.Now().Unix())-cur_ts < j.StartSecs {
 			j.SetState(BACKOFF)
@@ -123,23 +140,15 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup) {
 			}
 		}
 	}
-	if j.State == BACKOFF {
+	if j.Is(BACKOFF) {
 		j.SetState(FATAL)
+	} else if j.Is(STOPPING) {
+		j.SetState(STOPPED)
 	}
-	j.running = false
+	j._running = false
 }
 
 func (j *Job) tryStart() error {
-	cmd_list := []string{
-		"sh",
-		"-c",
-		fmt.Sprintf("umask %v && %v", j.Umask, j.Command),
-	}
-
-	cmd := exec.Command(cmd_list[0], cmd_list[1:]...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	j.cmd = cmd
-
 	if j.StdoutLogFile != "" {
 		file, err := utils.OpenLogFile(j.StdoutLogFile)
 		if err != nil {
@@ -170,50 +179,45 @@ func (j *Job) tryStart() error {
 		return err
 	}
 
-	return err
+	return nil
 }
 
-func (j *Job) Restart(wg *sync.WaitGroup) {
-	if j.restarting {
+func (j *Job) Restart(wg *sync.WaitGroup, _done chan bool) {
+	if j.Is(STOPPING) || j._restarting {
 		return
 	}
-	if j.running {
-		go j.restartJobWorker(wg)
-	} else {
-		j.Start(wg)
-	}
+
+	j._restarting = true
+	done := make(chan bool, 1)
+	defer close(done)
+	j.Stop(wg, done)
+	j.Start(wg, _done)
+	j._restarting = false
 }
 
-func (j *Job) restartJobWorker(wg *sync.WaitGroup) {
-	wg.Add(1)
-	defer wg.Done()
+func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool) error {
+	defer func() { _done <- true }()
+	if j.Is(STOPPING) {
+		return nil
+	}
 
-	j.Stop()
-	j.restarting = true
-	if !j.stopping {
-		j.WaitJob()
-	}
-	if !j.stopping {
-		j.Start(wg)
-	}
-	j.restarting = false
-}
-
-func (j *Job) WaitJob() {
-	for j.running {
-		time.Sleep(100 * time.Millisecond)
-	}
-}
-
-func (j *Job) Stop() {
-	if j.restarting {
-		j.stopping = true
-	}
 	if j.Is(RUNNING) {
 		j.SetState(STOPPING)
-		err := syscall.Kill(-j.cmd.Process.Pid, j.StopSignal)
+		cur := time.Now().Unix()
+		err := syscall.Kill(-j.cmd.Process.Pid, syscall.SIGKILL)
 		if err != nil {
-			utils.Errorf(err.Error())
+			return err
+		}
+
+		for time.Now().Unix()-cur < int64(j.StopWaitSecs) && j._running {
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		if j._running {
+			err = syscall.Kill(-j.cmd.Process.Pid, j.StopSignal)
+			return err
 		}
 	}
+
+	return nil
 }

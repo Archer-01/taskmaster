@@ -27,7 +27,6 @@ func (j *Job) SetState(state string) error {
 		j.State = state
 	case STOPPED:
 		j.State = STOPPED
-		j.stopping = false
 	default:
 		return fmt.Errorf("invalid state: %s", state)
 	}

@@ -37,9 +37,13 @@ func (r *Response) HasContent() bool {
 }
 
 func (m *JobManager) Execute(action string, args ...string) *Response {
+	done := make(chan bool, 1)
+	defer close(done)
+
 	switch action {
 	case QUIT, RELOAD:
-		m.actions <- Action{Type: action}
+		m.actions <- Action{Type: action, Done: done}
+		<-done
 		return NewResponse()
 	case START, STOP, STATUS, RESTART:
 		if len(args) != 1 {
@@ -52,7 +56,8 @@ func (m *JobManager) Execute(action string, args ...string) *Response {
 		if action == STATUS {
 			return NewResponseWithBody(j.State)
 		}
-		m.actions <- Action{Type: action, Args: args}
+		m.actions <- Action{Type: action, Args: args, Done: done}
+		<-done
 		return NewResponse()
 	}
 	return BadRequest(fmt.Errorf("%s Unknown command", action))

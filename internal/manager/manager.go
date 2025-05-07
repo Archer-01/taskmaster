@@ -21,6 +21,7 @@ const (
 type Action struct {
 	Type string
 	Args []string
+	Done chan bool
 }
 
 type JobManager struct {
@@ -55,12 +56,17 @@ func (m *JobManager) Init() error {
 }
 
 func (m *JobManager) start() {
+	var done chan bool
+
 	for _, j := range m.Jobs {
 		if !j.Autostart {
 			continue
 		}
 
-		j.Start(m.wg)
+		done = make(chan bool, 1)
+		defer close(done)
+		j.Start(m.wg, done)
+		<-done
 	}
 }
 
@@ -74,33 +80,38 @@ func (m *JobManager) Run() {
 			m.stop()
 			utils.Logf("[QUITTING]")
 			m.finish()
+			action.Done <- true
 			return
 
 		case RELOAD:
 			utils.Logf("[RELOADING]")
 			m.reload()
+			action.Done <- true
 
 		case START:
 			utils.Logf("[STARTING] Program(name=%s)", action.Args[0])
-			m.Jobs[action.Args[0]].Start(m.wg)
+			go m.Jobs[action.Args[0]].Start(m.wg, action.Done)
 
 		case STOP:
 			utils.Logf("[STOPPING] Program(name=%s)", action.Args[0])
-			m.Jobs[action.Args[0]].Stop()
+			go m.Jobs[action.Args[0]].Stop(m.wg, action.Done)
 
 		case RESTART:
 			utils.Logf("[RESTARTING] Program(name=%s)", action.Args[0])
-			m.Jobs[action.Args[0]].Restart(m.wg)
+			go m.Jobs[action.Args[0]].Restart(m.wg, action.Done)
 		}
 	}
 }
 
 func (m *JobManager) stop() {
+	var done chan bool
+
 	for _, j := range m.Jobs {
 		utils.Logf("[EXITING] Program(name=%s)", j.Name)
-
-		j.Stop()
-		j.WaitJob()
+		done = make(chan bool, 1)
+		defer close(done)
+		j.Stop(m.wg, done)
+		<-done
 	}
 }
 
