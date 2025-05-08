@@ -38,6 +38,17 @@ func (m *JobManager) Init() error {
 		return err
 	}
 
+	if conf.User != "" {
+		fmt.Printf("[NOTICE] De-escalating privilege to user %v\n", conf.User)
+
+		if err := utils.DeEscalatePrivilege(conf.User); err != nil {
+			utils.Errorf(err.Error())
+			os.Exit(1)
+		}
+
+		fmt.Println("[NOTICE] De-escalation successful")
+	}
+
 	var jobs []*job.Job
 	for name, prog := range conf.Programs {
 		jobs = append(jobs, job.NewJob(name, prog))

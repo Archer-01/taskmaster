@@ -1,3 +1,5 @@
+user = "taskmaster"
+
 [program.one]
 command = "ping localhost"
 

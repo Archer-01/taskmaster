@@ -15,11 +15,12 @@ type Program struct {
 	Directory     string   `toml:"directory"`
 	StdoutLogFile string   `toml:"stdout_logfile"`
 	StderrLogFile string   `toml:"stderr_logfile"`
-	Umask string `toml:"umask" validate:"default=0022"`
+	Umask         string   `toml:"umask" validate:"default=0022"`
 }
 
 type Config struct {
 	Programs map[string]*Program `toml:"program"`
+	User     string              `toml:"user"`
 }
 
 func ParseCommand(cmd string) []string {
