@@ -11,7 +11,7 @@ import (
 
 func (m *JobManager) InitSignals() {
 	m.sigs = make(chan os.Signal, 1)
-	signal.Notify(m.sigs, syscall.SIGQUIT, syscall.SIGHUP)
+	signal.Notify(m.sigs, syscall.SIGQUIT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
 }
 
 func (m *JobManager) StopSignals() {
@@ -32,7 +32,7 @@ func (m *JobManager) WaitForSignals(wg *sync.WaitGroup) {
 
 		switch sig {
 
-		case syscall.SIGQUIT:
+		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
 			m.actions <- Action{Type: QUIT}
 			return
 
