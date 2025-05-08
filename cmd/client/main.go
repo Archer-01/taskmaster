@@ -40,6 +40,9 @@ func main() {
 		if err == io.EOF {
 			return
 		}
+		if err == readline.ErrInterrupt {
+			continue
+		}
 		if err != nil {
 			break
 		}

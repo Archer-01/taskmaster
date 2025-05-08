@@ -1,6 +1,10 @@
 package utils
 
 import (
+	"strconv"
+	"syscall"
+	"os/user"
+
 	"github.com/Archer-01/taskmaster/internal/parser/config"
 	"github.com/BurntSushi/toml"
 )
@@ -29,4 +33,24 @@ func ParseSetupFile() (Setup, error) {
 	}
 
 	return setup, nil
+}
+
+func DeEscalatePrivilege(username string) error {
+	u, err := user.Lookup(username)
+
+	if err != nil {
+		return err
+	}
+
+	newUid, err := strconv.Atoi(u.Uid)
+
+	if err != nil {
+		return err
+	}
+
+	if err := syscall.Setuid(newUid); err != nil {
+		return err
+	}
+
+	return nil
 }

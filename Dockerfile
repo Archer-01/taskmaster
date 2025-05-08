@@ -11,5 +11,6 @@ COPY . .
 RUN go build -o /usr/local/bin/taskmasterd cmd/server/main.go
 RUN go build -o /usr/local/bin/taskmasterctl cmd/client/main.go
 
+RUN useradd "taskmaster"
+
 CMD [ "taskmasterd" ]
-# CMD ["tail", "-f"]

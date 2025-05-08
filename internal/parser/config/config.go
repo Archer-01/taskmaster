@@ -26,6 +26,7 @@ type Program struct {
 
 type Config struct {
 	Programs map[string]*Program `toml:"program"`
+	User     string              `toml:"user"`
 }
 
 func ParseCommand(cmd string) []string {
