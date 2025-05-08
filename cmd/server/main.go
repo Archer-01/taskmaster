@@ -19,7 +19,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	Manager := manager.NewJobManager(setup.Config)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	Manager := manager.NewJobManager(setup.Config, &wg)
 	err = Manager.Init()
 	if err != nil {
 		log.Fatal(err)
@@ -30,9 +33,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	Manager.InitSignals()
 	go Manager.WaitForSignals(&wg)

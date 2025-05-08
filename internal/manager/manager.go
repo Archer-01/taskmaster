@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/Archer-01/taskmaster/internal/job"
 	"github.com/Archer-01/taskmaster/internal/parser/config"
@@ -10,25 +11,32 @@ import (
 )
 
 const (
-	QUIT   = "quit"
-	RELOAD = "reload"
+	QUIT    = "quit"
+	RELOAD  = "reload"
+	START   = "start"
+	STOP    = "stop"
+	RESTART = "restart"
 )
 
 type Action struct {
-	t string
+	Type string
+	Args []string
+	Done chan bool
 }
 
 type JobManager struct {
-	Jobs    []*job.Job
+	Jobs    map[string]*job.Job
 	Config  string
-	actions chan string
+	actions chan Action
 	sigs    chan os.Signal
+	wg      *sync.WaitGroup
 }
 
-func NewJobManager(path string) *JobManager {
+func NewJobManager(path string, wg *sync.WaitGroup) *JobManager {
 	return &JobManager{
 		Config:  path,
-		actions: make(chan string, 1),
+		actions: make(chan Action, 1),
+		wg:      wg,
 	}
 }
 
@@ -49,9 +57,9 @@ func (m *JobManager) Init() error {
 		fmt.Println("[NOTICE] De-escalation successful")
 	}
 
-	var jobs []*job.Job
+	jobs := make(map[string]*job.Job, 1)
 	for name, prog := range conf.Programs {
-		jobs = append(jobs, job.NewJob(name, prog))
+		jobs[name] = job.NewJob(name, prog)
 	}
 
 	m.Jobs = jobs
@@ -59,63 +67,62 @@ func (m *JobManager) Init() error {
 }
 
 func (m *JobManager) start() {
+	var done chan bool
+
 	for _, j := range m.Jobs {
 		if !j.Autostart {
 			continue
 		}
 
-		err := j.StartJob()
-		if err != nil {
-			utils.Errorf(err.Error())
-		}
+		done = make(chan bool, 1)
+		defer close(done)
+		j.Start(m.wg, done)
+		<-done
 	}
-}
-
-func (m *JobManager) Execute(action string, args ...string) error {
-	switch action {
-	case QUIT:
-		m.actions <- QUIT
-	case RELOAD:
-		m.actions <- RELOAD
-	default:
-		return fmt.Errorf("%s Unknown command", action)
-	}
-	return nil
 }
 
 func (m *JobManager) Run() {
 	m.start()
 	for {
 		action := <-m.actions
-		switch action {
+		switch action.Type {
 
 		case QUIT:
 			m.stop()
+			utils.Logf("[QUITTING]")
 			m.finish()
+			action.Done <- true
 			return
 
 		case RELOAD:
+			utils.Logf("[RELOADING]")
 			m.reload()
+			action.Done <- true
 
+		case START:
+			utils.Logf("[STARTING] Program(name=%s)", action.Args[0])
+			go m.Jobs[action.Args[0]].Start(m.wg, action.Done)
+
+		case STOP:
+			utils.Logf("[STOPPING] Program(name=%s)", action.Args[0])
+			go m.Jobs[action.Args[0]].Stop(m.wg, action.Done)
+
+		case RESTART:
+			utils.Logf("[RESTARTING] Program(name=%s)", action.Args[0])
+			go m.Jobs[action.Args[0]].Restart(m.wg, action.Done)
 		}
 	}
 }
 
 func (m *JobManager) stop() {
+	var done chan bool
+
 	for _, j := range m.Jobs {
-		// HACK: This is a temporary fix
-		// Jobs should have a state (Started, Stopped, Running, ...etc)
-		// and that status must be checked before trying to finish a job
-		if !j.Autostart {
-			continue
-		}
-
-		utils.Logf("Exiting [%s]", j.Name)
-
-		err := j.Stop()
-		if err != nil {
-			utils.Errorf(err.Error())
-		}
+		utils.Logf("[EXITING] Program(name=%s)", j.Name)
+		done = make(chan bool, 1)
+		defer close(done)
+		j.Stop(m.wg, done)
+		<-done
 	}
 }
 

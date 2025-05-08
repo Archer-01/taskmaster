@@ -33,11 +33,11 @@ func (m *JobManager) WaitForSignals(wg *sync.WaitGroup) {
 		switch sig {
 
 		case syscall.SIGQUIT:
-			m.actions <- QUIT
+			m.actions <- Action{Type: QUIT}
 			return
 
 		case syscall.SIGHUP:
-			m.actions <- RELOAD
+			m.actions <- Action{Type: RELOAD}
 
 		}
 	}

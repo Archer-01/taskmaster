@@ -1,11 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/Archer-01/taskmaster/internal/client"
 	"github.com/Archer-01/taskmaster/internal/parser/interpreter"
+	"github.com/Archer-01/taskmaster/internal/server"
 	"github.com/Archer-01/taskmaster/internal/utils"
 	"github.com/chzyer/readline"
 )
@@ -48,14 +51,27 @@ func main() {
 			continue
 		}
 
-		args := interpreter.Parse(line)
+		args, err := interpreter.Parse(line)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+		}
+		if len(args) == 0 {
+			continue
+		}
 		if args[0] == interpreter.EXIT {
 			return
 		}
 
 		err = client.Send(strings.Join(args, " "))
 		if err != nil {
-			utils.Errorf("%s", err.Error())
+			utils.Errorf(err.Error())
+		}
+
+		res := client.Read(server.DEL)
+		if res.Err != nil {
+			utils.Errorf(err.Error())
+		} else if res.HasContent() {
+			utils.Logf(res.Data)
 		}
 	}
 }

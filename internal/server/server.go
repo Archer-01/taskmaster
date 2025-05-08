@@ -20,44 +20,44 @@ type SocketAction struct {
 }
 
 type Server struct {
-	JobManager *manager.JobManager
-	Conns      map[*Socket]bool
-	Addr       string
-	Socket     net.Listener
-	done       chan bool
-	sockets    chan SocketAction
+	j       *manager.JobManager
+	conns   map[*Socket]bool
+	addr    string
+	sock    net.Listener
+	done    chan bool
+	sockets chan SocketAction
 }
 
 func NewServer(addr string, m *manager.JobManager) *Server {
 	var s Server
 
-	s.Addr = addr
-	s.JobManager = m
+	s.addr = addr
+	s.j = m
 	s.done = make(chan bool, 1)
 	s.sockets = make(chan SocketAction, 1)
-	s.Conns = make(map[*Socket]bool)
+	s.conns = make(map[*Socket]bool)
 
 	return &s
 }
 
 func (s *Server) Stop() {
-	utils.Logf("Closing Server")
+	utils.Logf("[INFO] Closing Server")
 	close(s.done)
 	close(s.sockets)
-	s.Socket.Close()
-	os.Remove(s.Addr)
-	for client := range s.Conns {
+	s.sock.Close()
+	os.Remove(s.addr)
+	for client := range s.conns {
 		client.Close()
 	}
 }
 
 func (s *Server) Init() error {
-	sock, err := net.Listen("unix", s.Addr)
+	sock, err := net.Listen("unix", s.addr)
 	if err != nil {
 		return err
 	}
 
-	s.Socket = sock
+	s.sock = sock
 	return nil
 }
 
@@ -73,9 +73,9 @@ func (s *Server) HandleSocketsList(wg *sync.WaitGroup) {
 
 		switch val.add {
 		case true:
-			s.Conns[val.socket] = false
+			s.conns[val.socket] = false
 		case false:
-			delete(s.Conns, val.socket)
+			delete(s.conns, val.socket)
 		}
 	}
 }
@@ -83,7 +83,7 @@ func (s *Server) HandleSocketsList(wg *sync.WaitGroup) {
 func (s *Server) Start(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
-	utils.Logf("Starting Server")
+	utils.Logf("[SERVER] Starting Server")
 
 	go s.HandleSocketsList(wg)
 	var er error = nil
@@ -95,11 +95,11 @@ func (s *Server) Start(wg *sync.WaitGroup) {
 		default:
 			if er != nil {
 				// this is for accept error only if server is not closed
-				utils.Errorf("Server: %s", er)
+				utils.Errorf("[SERVER] %s", er)
 				time.Sleep(100 * time.Millisecond)
 			}
 
-			con, err := s.Socket.Accept()
+			con, err := s.sock.Accept()
 			if er = err; err != nil {
 				continue
 			}

@@ -16,6 +16,12 @@ type Program struct {
 	StdoutLogFile string   `toml:"stdout_logfile"`
 	StderrLogFile string   `toml:"stderr_logfile"`
 	Umask         string   `toml:"umask" validate:"default=0022"`
+	StartSecs     int      `toml:"startsecs" validate:"default=1,min=0"`
+	StartRetries  int      `toml:"startretries" validate:"default=3,min=0"`
+	Autorestart   string   `toml:"autorestart" validate:"default=unexpected,enum=false|unexpected|true"`
+	StopSignal    string   `toml:"stopsignal" validate:"default=TERM,enum=TERM|HUP|INT|QUIT|KILL|USR1|USR2"`
+	StopWaitSecs  int      `toml:"stopwaitsecs" validate:"default=10,min=0"`
+	ExitCodes     []int    `toml:"exitcodes"`
 }
 
 type Config struct {
