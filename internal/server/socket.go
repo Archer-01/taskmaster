@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Archer-01/taskmaster/internal/utils"
+	"github.com/Archer-01/taskmaster/internal/logger"
 )
 
 type Socket struct {
@@ -56,7 +56,7 @@ func (_sv *Server) handleConnection(del byte, s *Socket, wg *sync.WaitGroup) {
 			}
 
 			if er != nil {
-				utils.Errorf("[SERVER]: %s", er.Error())
+				logger.Error(er)
 			}
 
 			line, err := s.Rd.ReadString(del)
