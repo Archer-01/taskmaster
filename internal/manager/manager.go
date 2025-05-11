@@ -66,6 +66,64 @@ func (m *JobManager) Init() error {
 	return nil
 }
 
+func (m *JobManager) reload() error {
+	conf, err := config.ParseConfig(m.Config)
+	if err != nil {
+		return err
+	}
+
+	if conf.User != "" {
+		fmt.Printf("[NOTICE] De-escalating privilege to user %v\n", conf.User)
+
+		if err := utils.DeEscalatePrivilege(conf.User); err != nil {
+			utils.Errorf(err.Error())
+			os.Exit(1)
+		}
+
+		fmt.Println("[NOTICE] De-escalation successful")
+	}
+
+	stop := make([]chan bool, 0)
+	for name, j := range m.Jobs {
+		_, fd := conf.Programs[name]
+		if !fd {
+			d := make(chan bool, 1)
+			stop = append(stop, d)
+			go j.Stop(m.wg, d)
+			delete(m.Jobs, name)
+		}
+	}
+
+	start := make([]chan bool, 0)
+	for name, prog := range conf.Programs {
+
+		j, fd := m.Jobs[name]
+		d := make(chan bool, 1)
+		start = append(start, d)
+
+		if fd {
+			go j.Reload(m.wg, d, prog)
+		} else {
+
+			j = job.NewJob(name, prog)
+			m.Jobs[name] = j
+
+			go j.Start(m.wg, d)
+		}
+	}
+
+	for _, _done := range stop {
+		defer close(_done)
+		<-_done
+	}
+	for _, _done := range start {
+		defer close(_done)
+		<-_done
+	}
+
+	return nil
+}
+
 func (m *JobManager) start() {
 	var done chan bool
 
@@ -128,13 +186,4 @@ func (m *JobManager) stop() {
 
 func (m *JobManager) finish() {
 	close(m.actions)
-}
-
-func (m *JobManager) reload() {
-	m.stop()
-
-	m.Init()
-	fmt.Println(os.Getpid())
-
-	m.start()
 }

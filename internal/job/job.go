@@ -221,3 +221,74 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool) error {
 
 	return nil
 }
+
+func (j *Job) Reload(wg *sync.WaitGroup, _done chan bool, prog *config.Program) error {
+	wg.Add(1)
+	defer wg.Done()
+
+	shouldRestart := j.reread(prog)
+	if shouldRestart && j._running {
+		go j.Restart(wg, _done)
+		return nil
+	}
+
+	_done <- true
+	return nil
+}
+
+func (j *Job) reread(prog *config.Program) bool {
+	shouldRestart := false
+
+	if prog.Command != j.Command {
+		j.Command = prog.Command
+		shouldRestart = true
+	}
+
+	if prog.Directory != j.Dir {
+		j.Dir = prog.Directory
+		shouldRestart = true
+	}
+
+	{
+		table := make(map[string]int, len(j.Environment))
+		for _, env := range j.Environment {
+			table[env] += 1
+		}
+		for _, env := range prog.Environment {
+			table[env] += 1
+		}
+		for _, c := range table {
+			if c != 2 {
+				shouldRestart = true
+				j.Environment = prog.Environment
+				break
+			}
+		}
+
+	}
+
+	if prog.Umask != j.Umask {
+		j.Umask = prog.Umask
+		shouldRestart = true
+	}
+
+	if prog.StderrLogFile != j.StderrLogFile {
+		prog.StderrLogFile = j.StderrLogFile
+		shouldRestart = true
+	}
+
+	if prog.StdoutLogFile != j.StdoutLogFile {
+		prog.StdoutLogFile = j.StdoutLogFile
+		shouldRestart = true
+	}
+
+	j.Autostart = prog.Autostart
+	j.ExitCodes = prog.ExitCodes
+	j.StopWaitSecs = prog.StopWaitSecs
+	j.StopSignal = utils.ParseSignal(prog.StopSignal)
+	j.Autorestart = prog.Autorestart
+	j.StartSecs = prog.StartSecs
+	j.StartRetries = prog.StartRetries
+
+	return shouldRestart
+}
