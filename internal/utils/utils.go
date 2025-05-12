@@ -2,9 +2,16 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"sync"
 	"syscall"
 )
+
+type DynamicWriter struct {
+	mu     sync.RWMutex
+	writer io.Writer
+}
 
 func Hello(name string) string {
 	message := fmt.Sprintf("Hello %v", name)
@@ -49,4 +56,21 @@ func ParseSignal(str string) syscall.Signal {
 	default:
 		return syscall.SIGTERM
 	}
+}
+
+func (d *DynamicWriter) Write(p []byte) (int, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.writer == nil {
+		return 0, io.ErrClosedPipe
+	}
+
+	return d.writer.Write(p)
+}
+
+func (d *DynamicWriter) SetWriter(w io.Writer) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.writer = w
 }
