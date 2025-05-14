@@ -2,6 +2,7 @@ package job
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -32,6 +33,8 @@ type Job struct {
 	StopWaitSecs  int
 	_running      bool
 	_restarting   bool
+	StdoutWriter  *utils.DynamicWriter
+	StderrWriter  *utils.DynamicWriter
 }
 
 func NewJob(name string, prog *config.Program) *Job {
@@ -65,6 +68,8 @@ func NewJob(name string, prog *config.Program) *Job {
 		StopWaitSecs:  prog.StopWaitSecs,
 		_running:      false,
 		_restarting:   false,
+		StdoutWriter:  &utils.DynamicWriter{},
+		StderrWriter:  &utils.DynamicWriter{},
 	}
 }
 
@@ -152,33 +157,38 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, done chan bool) {
 	j._running = false
 }
 
+func (j *Job) setLog(file string, writer *utils.DynamicWriter, _default io.Writer) error {
+	if file != "" {
+		file, err := utils.OpenLogFile(file)
+		if err != nil {
+			return err
+		}
+
+		writer.SetWriter(file)
+	} else if _default != nil {
+		writer.SetWriter(_default)
+	}
+	return nil
+}
+
 func (j *Job) tryStart() error {
-	if j.StdoutLogFile != "" {
-		file, err := utils.OpenLogFile(j.StdoutLogFile)
-		if err != nil {
-			return err
-		}
-
-		j.cmd.Stdout = file
-	} else {
-		j.cmd.Stdout = os.Stdout
+	err := j.setLog(j.StdoutLogFile, j.StdoutWriter, os.Stdout)
+	if err != nil {
+		return err
 	}
 
-	if j.StderrLogFile != "" {
-		file, err := utils.OpenLogFile(j.StderrLogFile)
-		if err != nil {
-			return err
-		}
-
-		j.cmd.Stderr = file
-	} else {
-		j.cmd.Stderr = os.Stderr
+	err = j.setLog(j.StderrLogFile, j.StderrWriter, os.Stderr)
+	if err != nil {
+		return err
 	}
+
+	j.cmd.Stdout = j.StdoutWriter
+	j.cmd.Stderr = j.StderrWriter
 
 	j.cmd.Env = append(j.Environment, os.Environ()...)
 	j.cmd.Dir = j.Dir
 
-	err := j.cmd.Start()
+	err = j.cmd.Start()
 	if err != nil {
 		return err
 	}
@@ -225,4 +235,83 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool) error {
 	}
 
 	return nil
+}
+
+func (j *Job) Reload(wg *sync.WaitGroup, _done chan bool, prog *config.Program) error {
+	wg.Add(1)
+	defer wg.Done()
+
+	stdoutChanged := j.StdoutLogFile != prog.StdoutLogFile
+	stderrChanged := j.StderrLogFile != prog.StderrLogFile
+	shouldRestart := j.reread(prog)
+	if shouldRestart && j._running {
+		go j.Restart(wg, _done)
+		return nil
+	}
+
+	if stdoutChanged {
+		j.setLog(j.StdoutLogFile, j.StdoutWriter, os.Stdout)
+	}
+
+	if stderrChanged {
+		j.setLog(j.StderrLogFile, j.StderrWriter, os.Stderr)
+	}
+
+	_done <- true
+	return nil
+}
+
+func (j *Job) reread(prog *config.Program) bool {
+	shouldRestart := false
+
+	if prog.Command != j.Command {
+		j.Command = prog.Command
+		shouldRestart = true
+	}
+
+	if prog.Directory != j.Dir {
+		j.Dir = prog.Directory
+		shouldRestart = true
+	}
+
+	{
+		table := make(map[string]int, len(j.Environment))
+		for _, env := range j.Environment {
+			table[env] += 1
+		}
+		for _, env := range prog.Environment {
+			table[env] += 1
+		}
+		for _, c := range table {
+			if c != 2 {
+				shouldRestart = true
+				j.Environment = prog.Environment
+				break
+			}
+		}
+
+	}
+
+	if prog.Umask != j.Umask {
+		j.Umask = prog.Umask
+		shouldRestart = true
+	}
+
+	if prog.StderrLogFile != j.StderrLogFile {
+		j.StderrLogFile = prog.StderrLogFile
+	}
+
+	if prog.StdoutLogFile != j.StdoutLogFile {
+		j.StdoutLogFile = prog.StdoutLogFile
+	}
+
+	j.Autostart = prog.Autostart
+	j.ExitCodes = prog.ExitCodes
+	j.StopWaitSecs = prog.StopWaitSecs
+	j.StopSignal = utils.ParseSignal(prog.StopSignal)
+	j.Autorestart = prog.Autorestart
+	j.StartSecs = prog.StartSecs
+	j.StartRetries = prog.StartRetries
+
+	return shouldRestart
 }
