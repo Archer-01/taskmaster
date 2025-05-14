@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Archer-01/taskmaster/internal/logger"
 	"github.com/Archer-01/taskmaster/internal/parser/config"
 	"github.com/Archer-01/taskmaster/internal/utils"
 )
@@ -102,7 +103,7 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, done chan bool) {
 		j.SetState(STARTING)
 		err := j.tryStart()
 		if err != nil {
-			utils.Errorf(err.Error())
+			logger.Error(err)
 			j.SetState(BACKOFF)
 			retries++
 			if j.StartRetries == retries {

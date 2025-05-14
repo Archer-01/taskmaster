@@ -6,11 +6,6 @@ import (
 	"syscall"
 )
 
-func Hello(name string) string {
-	message := fmt.Sprintf("Hello %v", name)
-	return message
-}
-
 func Logf(format string, a ...any) {
 	fmt.Fprintf(os.Stdout, format+"\n", a...)
 }

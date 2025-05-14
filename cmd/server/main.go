@@ -1,22 +1,18 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"sync"
 
+	"github.com/Archer-01/taskmaster/internal/logger"
 	"github.com/Archer-01/taskmaster/internal/manager"
 	"github.com/Archer-01/taskmaster/internal/server"
 	"github.com/Archer-01/taskmaster/internal/utils"
 )
 
 func main() {
-	message := utils.Hello("server")
-	fmt.Println(message)
-
 	setup, err := utils.ParseSetupFile()
 	if err != nil {
-		log.Fatal(err)
+		logger.Critical(err)
 	}
 
 	var wg sync.WaitGroup
@@ -25,13 +21,13 @@ func main() {
 	Manager := manager.NewJobManager(setup.Config, &wg)
 	err = Manager.Init()
 	if err != nil {
-		log.Fatal(err)
+		logger.Critical(err)
 	}
 
 	Server := server.NewServer(setup.Socket, Manager)
 	err = Server.Init()
 	if err != nil {
-		log.Fatal(err)
+		logger.Critical(err)
 	}
 
 	Manager.InitSignals()
