@@ -6,12 +6,12 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/Archer-01/taskmaster/internal/utils"
+	"github.com/Archer-01/taskmaster/internal/logger"
 )
 
 func (m *JobManager) InitSignals() {
 	m.sigs = make(chan os.Signal, 1)
-	signal.Notify(m.sigs, syscall.SIGQUIT, syscall.SIGHUP)
+	signal.Notify(m.sigs, syscall.SIGQUIT, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
 }
 
 func (m *JobManager) StopSignals() {
@@ -24,15 +24,16 @@ func (m *JobManager) WaitForSignals(wg *sync.WaitGroup) {
 
 	for {
 		sig, ok := <-m.sigs
+
 		if !ok {
 			return
 		}
 
-		utils.Logf("\nCaught signal: '%s'\n", sig)
+		logger.Warnf("Caught signal: %s", sig)
 
 		switch sig {
 
-		case syscall.SIGQUIT:
+		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
 			m.actions <- Action{Type: QUIT}
 			return
 

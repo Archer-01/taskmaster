@@ -1,6 +1,8 @@
 package manager
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const (
 	STATUS = "status"
@@ -40,25 +42,27 @@ func (m *JobManager) Execute(action string, args ...string) *Response {
 	done := make(chan bool, 1)
 	defer close(done)
 
+	data := make(chan string, 1)
+	defer close(data)
+
 	switch action {
-	case QUIT, RELOAD:
-		m.actions <- Action{Type: action, Done: done}
-		<-done
-		return NewResponse()
-	case START, STOP, STATUS, RESTART:
-		if len(args) != 1 {
-			return BadRequest(fmt.Errorf("%s command must be followed by one argument", action))
+	case QUIT, RELOAD, START, STOP, RESTART:
+		m.actions <- Action{Type: action, Done: done, Data: data, Args: args}
+		success := <-done
+		if success {
+			return NewResponse()
+		} else {
+			return BadRequest(fmt.Errorf(<-data))
 		}
-		j, found := m.Jobs[args[0]]
-		if !found {
-			return BadRequest(fmt.Errorf("%s is not recognizable", args[0]))
+
+	case STATUS:
+		m.actions <- Action{Type: action, Done: done, Data: data, Args: args}
+		success := <-done
+		if success {
+			return NewResponseWithBody(<-data)
+		} else {
+			return BadRequest(fmt.Errorf(<-data))
 		}
-		if action == STATUS {
-			return NewResponseWithBody(j.State)
-		}
-		m.actions <- Action{Type: action, Args: args, Done: done}
-		<-done
-		return NewResponse()
 	}
 	return BadRequest(fmt.Errorf("%s Unknown command", action))
 }

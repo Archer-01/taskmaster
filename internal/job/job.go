@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Archer-01/taskmaster/internal/logger"
 	"github.com/Archer-01/taskmaster/internal/parser/config"
 	"github.com/Archer-01/taskmaster/internal/utils"
 )
@@ -72,16 +73,19 @@ func NewJob(name string, prog *config.Program) *Job {
 	}
 }
 
-func (j *Job) Start(wg *sync.WaitGroup, _done chan bool) {
+type WorkerFn = func(j *Job, wg *sync.WaitGroup, _done chan bool) error
+
+func (j *Job) Start(wg *sync.WaitGroup, _done chan bool) error {
 	defer func() { _done <- true }()
 	if j.Is(STOPPING) || j._running {
-		return
+		return nil
 	}
 	j._running = true
 	done := make(chan bool, 1)
 	defer close(done)
 	go j.startJobWorker(wg, done)
 	<-done
+	return nil
 }
 
 func (j *Job) startJobWorker(wg *sync.WaitGroup, done chan bool) {
@@ -104,7 +108,7 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, done chan bool) {
 		j.SetState(STARTING)
 		err := j.tryStart()
 		if err != nil {
-			utils.Errorf(err.Error())
+			logger.Error(err)
 			j.SetState(BACKOFF)
 			retries++
 			if j.StartRetries == retries {
@@ -192,9 +196,9 @@ func (j *Job) tryStart() error {
 	return nil
 }
 
-func (j *Job) Restart(wg *sync.WaitGroup, _done chan bool) {
+func (j *Job) Restart(wg *sync.WaitGroup, _done chan bool) error {
 	if j.Is(STOPPING) || j._restarting {
-		return
+		return nil
 	}
 
 	j._restarting = true
@@ -203,6 +207,7 @@ func (j *Job) Restart(wg *sync.WaitGroup, _done chan bool) {
 	j.Stop(wg, done)
 	j.Start(wg, _done)
 	j._restarting = false
+	return nil
 }
 
 func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool) error {
