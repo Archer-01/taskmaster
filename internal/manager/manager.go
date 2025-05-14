@@ -1,11 +1,11 @@
 package manager
 
 import (
-	"fmt"
 	"os"
 	"sync"
 
 	"github.com/Archer-01/taskmaster/internal/job"
+	"github.com/Archer-01/taskmaster/internal/logger"
 	"github.com/Archer-01/taskmaster/internal/parser/config"
 	"github.com/Archer-01/taskmaster/internal/utils"
 )
@@ -47,15 +47,17 @@ func (m *JobManager) Init() error {
 	}
 
 	if conf.User != "" {
-		fmt.Printf("[NOTICE] De-escalating privilege to user %v\n", conf.User)
+		logger.Infof("De-escalating privilege to user %s", conf.User)
 
 		if err := utils.DeEscalatePrivilege(conf.User); err != nil {
-			utils.Errorf(err.Error())
+			logger.Critical(err)
 			os.Exit(1)
 		}
 
-		fmt.Println("[NOTICE] De-escalation successful")
+		logger.Info("Privilege de-escalation successful")
 	}
+
+	logger.Infof("taskmasterd started with pid %d", os.Getpid())
 
 	jobs := make(map[string]*job.Job, 1)
 	for name, prog := range conf.Programs {
@@ -89,26 +91,26 @@ func (m *JobManager) Run() {
 
 		case QUIT:
 			m.stop()
-			utils.Logf("[QUITTING]")
+			logger.Info("Quitting...")
 			m.finish()
 			action.Done <- true
 			return
 
 		case RELOAD:
-			utils.Logf("[RELOADING]")
+			logger.Warn("Reloading...")
 			m.reload()
 			action.Done <- true
 
 		case START:
-			utils.Logf("[STARTING] Program(name=%s)", action.Args[0])
+			logger.Infof("Starting program %s", action.Args[0])
 			go m.Jobs[action.Args[0]].Start(m.wg, action.Done)
 
 		case STOP:
-			utils.Logf("[STOPPING] Program(name=%s)", action.Args[0])
+			logger.Warnf("Stopping program %s", action.Args[0])
 			go m.Jobs[action.Args[0]].Stop(m.wg, action.Done)
 
 		case RESTART:
-			utils.Logf("[RESTARTING] Program(name=%s)", action.Args[0])
+			logger.Warnf("Restarting program %s", action.Args[0])
 			go m.Jobs[action.Args[0]].Restart(m.wg, action.Done)
 		}
 	}
@@ -118,7 +120,7 @@ func (m *JobManager) stop() {
 	var done chan bool
 
 	for _, j := range m.Jobs {
-		utils.Logf("[EXITING] Program(name=%s)", j.Name)
+		logger.Infof("Exiting program %s", j.Name)
 		done = make(chan bool, 1)
 		defer close(done)
 		j.Stop(m.wg, done)
@@ -134,7 +136,6 @@ func (m *JobManager) reload() {
 	m.stop()
 
 	m.Init()
-	fmt.Println(os.Getpid())
 
 	m.start()
 }

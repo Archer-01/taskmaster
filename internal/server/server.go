@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Archer-01/taskmaster/internal/logger"
 	"github.com/Archer-01/taskmaster/internal/manager"
-	"github.com/Archer-01/taskmaster/internal/utils"
 )
 
 const (
@@ -41,7 +41,7 @@ func NewServer(addr string, m *manager.JobManager) *Server {
 }
 
 func (s *Server) Stop() {
-	utils.Logf("[INFO] Closing Server")
+	logger.Info("Closing server...")
 	close(s.done)
 	close(s.sockets)
 	s.sock.Close()
@@ -83,7 +83,7 @@ func (s *Server) HandleSocketsList(wg *sync.WaitGroup) {
 func (s *Server) Start(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer wg.Done()
-	utils.Logf("[SERVER] Starting Server")
+	logger.Info("Starting server...")
 
 	go s.HandleSocketsList(wg)
 	var er error = nil
@@ -95,7 +95,7 @@ func (s *Server) Start(wg *sync.WaitGroup) {
 		default:
 			if er != nil {
 				// this is for accept error only if server is not closed
-				utils.Errorf("[SERVER] %s", er)
+				logger.Error(er)
 				time.Sleep(100 * time.Millisecond)
 			}
 

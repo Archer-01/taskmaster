@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -43,16 +42,6 @@ func ParseConfig(file string) (Config, error) {
 	err_msg := Validate(&conf, mdata)
 	if err_msg != nil {
 		return conf, err_msg
-	}
-
-	for name, program := range conf.Programs {
-		fmt.Printf("Program: %s\n", name)
-		fmt.Printf("\tCommand: %s\n", program.Command)
-		fmt.Printf("\tAutostart: %s\n", program.Autostart)
-		// fmt.Printf("\tAutorestart: %s\n", program.Autorestart)
-		fmt.Printf("\tNumProcs: %s\n", program.NumProcs)
-		// fmt.Printf("\tStdoutLogFile: %s\n", program.StdoutLogFile)
-		// fmt.Printf("\tStderrLogFile: %s\n", program.StderrLogFile)
 	}
 
 	return conf, err
