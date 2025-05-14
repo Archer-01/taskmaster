@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"fmt"
 	"os"
 	"sync"
 
@@ -141,6 +142,7 @@ func (m *JobManager) start() {
 
 		done = make(chan bool, 1)
 		defer close(done)
+		logger.Infof("[STARTING] Program(name=%s)", j.Name)
 		j.Start(m.wg, done)
 		<-done
 	}
@@ -184,7 +186,7 @@ func (m *JobManager) Run() {
 }
 
 func (m *JobManager) runWorkerJob(j *job.Job, worker job.WorkerFn, done chan bool, state string) {
-	utils.Logf("[%s] Program(name=%s)", state, j.Name)
+	logger.Infof("[%s] Program(name=%s)", state, j.Name)
 	go worker(j, m.wg, done)
 }
 
@@ -264,6 +266,7 @@ func (m *JobManager) stop() {
 		logger.Infof("Exiting program %s", j.Name)
 		done = make(chan bool, 1)
 		defer close(done)
+		logger.Infof("[STOPPING] Program(name=%s)", j.Name)
 		j.Stop(m.wg, done)
 		<-done
 	}
