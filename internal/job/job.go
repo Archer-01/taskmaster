@@ -318,10 +318,19 @@ func (j *Job) Reload(wg *sync.WaitGroup, _done chan bool, prog *config.Program) 
 
 	stdoutChanged := j.StdoutLogFile != prog.StdoutLogFile
 	stderrChanged := j.StderrLogFile != prog.StderrLogFile
-	shouldRestart := j.reread(prog)
-	if shouldRestart && j.IsRunning() {
-		go j.Restart(wg, _done)
-		return nil
+	shouldRestart, shouldStop, shouldStart := j.reread(prog)
+	skipedDone := true
+	if j.IsRunning() {
+		if shouldStop {
+			skipedDone = false
+			go j.Stop(wg, _done)
+		} else if shouldRestart {
+			skipedDone = false
+			go j.Restart(wg, _done)
+		}
+	} else if shouldStart {
+		skipedDone = false
+		go j.Start(wg, _done)
 	}
 
 	if stdoutChanged {
@@ -332,12 +341,16 @@ func (j *Job) Reload(wg *sync.WaitGroup, _done chan bool, prog *config.Program) 
 		j.setLog(j.StderrLogFile, j.StderrWriter, os.Stderr)
 	}
 
-	_done <- true
+	if skipedDone {
+		_done <- true
+	}
 	return nil
 }
 
-func (j *Job) reread(prog *config.Program) bool {
-	shouldRestart := false
+func (j *Job) reread(prog *config.Program) (shouldRestart bool, shouldStop bool, shouldStart bool) {
+	shouldRestart = false
+	shouldStop = false
+	shouldStart = false
 
 	if prog.Command != j.Command {
 		j.Command = prog.Command
@@ -381,10 +394,11 @@ func (j *Job) reread(prog *config.Program) bool {
 	}
 
 	if j.Autostart != prog.Autostart {
+		j.Autostart = prog.Autostart
 		if !j.IsRunning() && prog.Autostart {
-			shouldRestart = true
+			shouldStart = true
 		} else if j.IsRunning() && !prog.Autostart {
-			shouldRestart = true
+			shouldStop = true
 		}
 	}
 	j.ExitCodes = prog.ExitCodes
@@ -403,5 +417,5 @@ func (j *Job) reread(prog *config.Program) bool {
 		}
 	}
 
-	return shouldRestart
+	return shouldRestart, shouldStop, shouldStart
 }
