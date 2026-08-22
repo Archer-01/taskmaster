@@ -387,10 +387,12 @@ func (j *Job) reread(prog *config.Program) (shouldRestart bool, shouldStop bool,
 
 	if prog.StderrLogFile != j.StderrLogFile {
 		j.StderrLogFile = prog.StderrLogFile
+		shouldRestart = true
 	}
 
 	if prog.StdoutLogFile != j.StdoutLogFile {
 		j.StdoutLogFile = prog.StdoutLogFile
+		shouldRestart = true
 	}
 
 	if j.Autostart != prog.Autostart {
