@@ -380,7 +380,13 @@ func (j *Job) reread(prog *config.Program) bool {
 		j.StdoutLogFile = prog.StdoutLogFile
 	}
 
-	j.Autostart = prog.Autostart
+	if j.Autostart != prog.Autostart {
+		if !j.IsRunning() && prog.Autostart {
+			shouldRestart = true
+		} else if j.IsRunning() && !prog.Autostart {
+			shouldRestart = true
+		}
+	}
 	j.ExitCodes = prog.ExitCodes
 	j.StopWaitSecs = prog.StopWaitSecs
 	j.StopSignal = utils.ParseSignal(prog.StopSignal)
