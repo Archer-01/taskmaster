@@ -111,15 +111,41 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, id int, pgid int) {
 		}
 
 		cur_ts := int(time.Now().Unix())
-		j.SetState(RUNNING, id)
 		if usePgid == 0 && j.cmds[id].Process != nil {
 			j.pgid[id], _ = syscall.Getpgid(j.cmds[id].Process.Pid)
 		}
 		j.closeStartReady(id)
-		err = j.cmds[id].Wait()
-		if err != nil {
-			logger.Debug(err)
+		_done := make(chan bool, 1)
+		__done := false
+		a := func() {
+			defer wg.Done()
+			err = j.cmds[id].Wait()
+			__done = true
+			if err != nil {
+				logger.Debug(err)
+			}
+			_done <- true
 		}
+		wg.Add(1)
+		go a()
+		b := func() {
+			defer wg.Done()
+			tick := time.NewTicker(100 * time.Millisecond)
+			defer tick.Stop()
+			for range tick.C {
+				if __done {
+					return
+				}
+				if int(time.Now().Unix())-cur_ts >= j.StartSecs {
+					j.SetState(RUNNING, id)
+				} else if j.Is(RUNNING, id) {
+					j.SetState(STARTING, id)
+				}
+			}
+		}
+		wg.Add(1)
+		go b()
+		<-_done
 
 		if j.Is(STOPPING, id) {
 			break
@@ -151,7 +177,10 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, id int, pgid int) {
 				}
 			}
 			if expected {
+				logger.Debugf("Process %s exited with expected exit code %d, not restarting", j.DisplayName(id), exitCode)
 				break
+			} else {
+				logger.Debugf("Process %s exited with unexpected exit code %d, restarting", j.DisplayName(id), exitCode)
 			}
 		}
 	}
@@ -186,7 +215,7 @@ func (j *Job) tryStart(procId int) error {
 
 	startMu.Lock()
 	old := syscall.Umask(parseUmask(j.Umask))
-	err = j.cmds[procId].Start()
+	err = j.StartCmd(procId)
 	syscall.Umask(old)
 	startMu.Unlock()
 	if err != nil {

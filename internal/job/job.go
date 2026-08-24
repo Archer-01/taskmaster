@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Archer-01/taskmaster/internal/parser/config"
 	"github.com/Archer-01/taskmaster/internal/utils"
@@ -16,6 +17,18 @@ import (
 // process-wide and concurrent starts could inherit the wrong one
 var startMu sync.Mutex
 
+func (p *Job) StartCmd(procId int) error {
+	if err := p.cmds[procId].Start(); err != nil {
+		return err
+	}
+	p.startTime[procId] = time.Now()
+	return nil
+}
+
+func (p *Job) Uptime(procId int) time.Duration {
+	return time.Since(p.startTime[procId])
+}
+
 type Job struct {
 	Name           string
 	Command        string
@@ -23,6 +36,7 @@ type Job struct {
 	Environment    []string
 	Dir            string
 	Autostart      bool
+	startTime      []time.Time
 	StdoutLogFile  string
 	StderrLogFile  string
 	Umask          string
@@ -45,7 +59,7 @@ type Job struct {
 	startReady     []chan struct{}
 	startOnce      []sync.Once
 	mustop         sync.Mutex
-	muproc         sync.Mutex
+	// muproc         sync.Mutex
 }
 
 func normalizeExitCodes(codes []int) []int {
@@ -102,6 +116,7 @@ func NewJob(name string, prog *config.Program) *Job {
 		pgid:           make([]int, prog.NumProcs),
 		startReady:     make([]chan struct{}, prog.NumProcs),
 		startOnce:      make([]sync.Once, prog.NumProcs),
+		startTime:      make([]time.Time, prog.NumProcs),
 		mustop:         sync.Mutex{},
 	}
 }

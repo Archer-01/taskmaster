@@ -1,9 +1,38 @@
 # user = "taskmaster"
 
-[program.one]
+[program.sleep]
 command = "sleep 1000"
 stopsignal = "INT"
 stdout_logfile = "one.log"
 autostart = true
-startsecs = 120
-numprocs = 4
+autorestart = "true"
+# startsecs = 100
+numprocs = 10
+startretries = 3
+
+# user = "taskmaster"
+
+[program.one]
+command = "ping localhost"
+stopsignal = "TERM"
+stdout_logfile = "one.log"
+# autostart = false
+
+[program.two]
+command = "ping 127.0.0.1"
+stopsignal = "INT"
+stdout_logfile = "two.log"
+# autostart = false
+startsecs = 5
+startretries = 10
+
+[program.three]
+# autostart = false
+command = "ping 0.0.0.0"
+stdout_logfile = "three.log"
+
+[program.four]
+# autostart = false
+command = "ping google.com"
+stdout_logfile = "four.log"
+numprocs = 3

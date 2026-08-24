@@ -4,26 +4,36 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/Archer-01/taskmaster/internal/logger"
 	"github.com/Archer-01/taskmaster/internal/parser/config"
 	"github.com/Archer-01/taskmaster/internal/utils"
 )
 
-func (j *Job) reread(prog *config.Program) (shouldRestart bool, shouldStop bool, shouldStart bool, numprocsChanged int) {
-	shouldRestart = false
-	shouldStop = false
-	shouldStart = false
-	numprocsChanged = 0
+type ChangedState struct {
+	shouldRestart    bool
+	shouldStop       bool
+	shouldStart      bool
+	numprocsChanged  int
+}
+
+func (j *Job) reread(prog *config.Program) ChangedState {
+	state := ChangedState{
+		shouldRestart:    false,
+		shouldStop:       false,
+		shouldStart:      false,
+		numprocsChanged:  0,
+	}
 
 	if prog.Command != j.Command {
 		j.Command = prog.Command
-		shouldRestart = true
+		state.shouldRestart = true
 	}
 
 	if prog.Directory != j.Dir {
 		j.Dir = prog.Directory
-		shouldRestart = true
+		state.shouldRestart = true
 	}
 
 	{
@@ -36,7 +46,7 @@ func (j *Job) reread(prog *config.Program) (shouldRestart bool, shouldStop bool,
 		}
 		for _, c := range table {
 			if c != 2 {
-				shouldRestart = true
+				state.shouldRestart = true
 				j.Environment = prog.Environment
 				break
 			}
@@ -46,25 +56,25 @@ func (j *Job) reread(prog *config.Program) (shouldRestart bool, shouldStop bool,
 
 	if prog.Umask != j.Umask {
 		j.Umask = prog.Umask
-		shouldRestart = true
+		state.shouldRestart = true
 	}
 
 	if prog.StderrLogFile != j.StderrLogFile {
 		j.StderrLogFile = prog.StderrLogFile
-		shouldRestart = true
+		state.shouldRestart = true
 	}
 
 	if prog.StdoutLogFile != j.StdoutLogFile {
 		j.StdoutLogFile = prog.StdoutLogFile
-		shouldRestart = true
+		state.shouldRestart = true
 	}
 
 	if j.Autostart != prog.Autostart {
 		j.Autostart = prog.Autostart
 		if !j.IsRunning() && prog.Autostart {
-			shouldStart = true
+			state.shouldStart = true
 		} else if j.IsRunning() && !prog.Autostart {
-			shouldStop = true
+			state.shouldStop = true
 		}
 	}
 	j.ExitCodes = normalizeExitCodes(prog.ExitCodes)
@@ -79,16 +89,20 @@ func (j *Job) reread(prog *config.Program) (shouldRestart bool, shouldStop bool,
 	if prog.RedirectStderr != j.RedirectStderr {
 		j.RedirectStderr = prog.RedirectStderr
 		if j.IsRunning() {
-			shouldRestart = true
+			state.shouldRestart = true
 		}
 	}
 
 	if prog.NumProcs != j.NumProcs {
-		numprocsChanged = prog.NumProcs - j.NumProcs
+		state.numprocsChanged = prog.NumProcs - j.NumProcs
 		j._NumProcs = prog.NumProcs
 	}
 
-	return shouldRestart, shouldStop, shouldStart, numprocsChanged
+	if prog.StartSecs != j.StartSecs {
+		j.StartSecs = prog.StartSecs
+	}
+
+	return state
 }
 
 func (j *Job) Resize(newSize int) {
@@ -100,12 +114,14 @@ func (j *Job) Resize(newSize int) {
 		j.pgid = j.pgid[:newSize]
 		j.startReady = j.startReady[:newSize]
 		j.startOnce = j.startOnce[:newSize]
+		j.startTime = j.startTime[:newSize]
 	} else if l < newSize {
 		cmds := make([]*exec.Cmd, newSize)
 		pgid := make([]int, newSize)
 		startReady := make([]chan struct{}, newSize)
 		startOnce := make([]sync.Once, newSize)
 		states := make([]string, newSize)
+		startTime := make([]time.Time, newSize)
 
 		for i := range states {
 			states[i] = STOPPED
@@ -117,6 +133,7 @@ func (j *Job) Resize(newSize int) {
 			running[i] = false
 		}
 
+		copy(startTime, j.startTime)
 		copy(cmds, j.cmds)
 		copy(pgid, j.pgid)
 		copy(startReady, j.startReady)
@@ -124,6 +141,7 @@ func (j *Job) Resize(newSize int) {
 		copy(states, j.State)
 		copy(running, j._running)
 
+		j.startTime = startTime
 		j.cmds = cmds
 		j.pgid = pgid
 		j.startReady = startReady
@@ -138,25 +156,25 @@ func (j *Job) Reload(wg *sync.WaitGroup, _done chan bool, prog *config.Program) 
 
 	stdoutChanged := j.StdoutLogFile != prog.StdoutLogFile
 	stderrChanged := j.StderrLogFile != prog.StderrLogFile
-	shouldRestart, shouldStop, shouldStart, numprocsChanged := j.reread(prog)
+	state := j.reread(prog)
 	skipedDone := true
 	if j.IsRunning() {
-		if shouldStop {
+		if state.shouldStop {
 			skipedDone = false
 			go j.Stop(wg, _done, -1, 1)
-		} else if shouldRestart {
+		} else if state.shouldRestart {
 			skipedDone = false
 			go j.Restart(wg, _done, -1, 1)
 		}
-		if numprocsChanged > 0 {
+		if state.numprocsChanged > 0 {
 			j.NumProcs = j._NumProcs
 			j.Resize(j._NumProcs)
-			go j.Start(wg, _done, j.NumProcs-numprocsChanged, numprocsChanged)
+			go j.Start(wg, _done, j.NumProcs-state.numprocsChanged, state.numprocsChanged)
 			skipedDone = false
-		} else if numprocsChanged < 0 {
-			num := -numprocsChanged
+		} else if state.numprocsChanged < 0 {
+			num := -state.numprocsChanged
 			ch := make(chan bool, 1)
-			go j.Stop(wg, ch, j.NumProcs+numprocsChanged, num)
+			go j.Stop(wg, ch, j.NumProcs+state.numprocsChanged, num)
 			go func() {
 				<-ch
 				logger.Debugf("Reload: resizing job to %d", j._NumProcs)
@@ -167,7 +185,7 @@ func (j *Job) Reload(wg *sync.WaitGroup, _done chan bool, prog *config.Program) 
 			}()
 			skipedDone = false
 		}
-	} else if shouldStart {
+	} else if state.shouldStart {
 		skipedDone = false
 		go j.Start(wg, _done, -1, 1)
 	}

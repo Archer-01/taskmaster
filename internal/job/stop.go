@@ -46,13 +46,13 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool, startProcId int, countPr
 	st := func(i int) {
 		defer _wg.Done()
 		logger.Debugf("Stop(): Stopping process %s", j.DisplayName(i))
-		j.muproc.Lock()
+		// j.muproc.Lock()
 		if !j.procAlive(i) {
-			j.muproc.Unlock()
+			// j.muproc.Unlock()
 		} else {
 			logger.Debugf("Stop(): Sending stop signal to process %s", j.DisplayName(i))
 			j.SetState(STOPPING, i)
-			j.muproc.Unlock()
+			// j.muproc.Unlock()
 
 			err := syscall.Kill(-j.pgid[i], j.StopSignal)
 			logger.Debugf("Stop(): Sent stop signal to process %s", j.DisplayName(i))
@@ -76,12 +76,12 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool, startProcId int, countPr
 				}
 			}
 		}
-		j.muproc.Lock()
+		// j.muproc.Lock()
 		logger.Debugf("Stop(): Process %s stopped", j.DisplayName(i))
 		j.SetPgid(i, 0)
 		j._running[i] = false
 		j.SetState(STOPPED, i)
-		j.muproc.Unlock()
+		// j.muproc.Unlock()
 	}
 
 	if startProcId >= 0 && startProcId < j.NumProcs {
