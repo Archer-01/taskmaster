@@ -11,7 +11,7 @@ import (
 
 type Setup struct {
 	Prompt string `toml:"prompt"`
-	Socket string `toml:"socket" validate:"default=/tmp/taskmaster.sock"`
+	Socket string `toml:"socket"`
 	Config string `toml:"config" validate:"default=taskmaster.toml"`
 }
 

@@ -32,9 +32,41 @@ type Config struct {
 }
 
 func ParseCommand(cmd string) []string {
-	return strings.FieldsFunc(cmd, func(r rune) bool {
-		return strings.ContainsRune(" \t\n\v\f\r", r)
-	})
+	var args []string
+	var cur strings.Builder
+	inWord := false
+	quote := rune(0)
+
+	flush := func() {
+		if inWord {
+			args = append(args, cur.String())
+			cur.Reset()
+			inWord = false
+		}
+	}
+
+	for _, r := range cmd {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(r)
+			}
+			inWord = true
+		case r == '\'' || r == '"':
+			quote = r
+			inWord = true
+		case strings.ContainsRune(" \t\n\v\f\r", r):
+			flush()
+		default:
+			cur.WriteRune(r)
+			inWord = true
+		}
+	}
+	flush()
+
+	return args
 }
 
 func ParseConfig(file string) (Config, error) {

@@ -11,7 +11,8 @@ import (
 type LogLevel uint8
 
 const (
-	InfoLevel LogLevel = iota
+	DebugLevel LogLevel = iota
+	InfoLevel
 	WarnLevel
 	ErrorLevel
 	CriticalLevel
@@ -19,6 +20,8 @@ const (
 
 func (lvl LogLevel) String() string {
 	switch lvl {
+	case DebugLevel:
+		return "DBUG"
 	case InfoLevel:
 		return "INFO"
 	case WarnLevel:
@@ -60,6 +63,20 @@ func Init() {
 
 func SetLevel(level LogLevel) {
 	logger.level = level
+}
+
+func Debug(a any) {
+	logger.log(DebugLevel, a)
+
+	message := fmt.Sprintf("%v", a)
+	logger.syslogger.Debug(message)
+}
+
+func Debugf(format string, a ...any) {
+	message := fmt.Sprintf(format, a...)
+	logger.log(DebugLevel, message)
+
+	logger.syslogger.Debug(message)
 }
 
 func Info(a any) {

@@ -1,7 +1,9 @@
 # user = "taskmaster"
 
 [program.one]
-command = "ping localhost"
-stopsignal = "TERM"
+command = "sleep 1000"
+stopsignal = "INT"
 stdout_logfile = "one.log"
-autostart = false
+autostart = true
+startsecs = 120
+numprocs = 12

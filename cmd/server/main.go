@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/Archer-01/taskmaster/internal/logger"
@@ -16,6 +18,11 @@ func main() {
 	if err != nil {
 		logger.Critical(err)
 	}
+
+	if setup.Socket == "" {
+		setup.Socket = fmt.Sprintf("/tmp/taskmasterd-%d.sock", os.Getpid())
+	}
+	logger.Infof("Socket: %s", setup.Socket)
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
