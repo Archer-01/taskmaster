@@ -99,7 +99,7 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, id int, pgid int) {
 		j.SetState(STARTING, id)
 		err := j.tryStart(id)
 		if err != nil {
-			logger.Error(err)
+			logger.Debug(err)
 			j.SetState(BACKOFF, id)
 			j.closeStartReady(id)
 			retries++
@@ -118,7 +118,7 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, id int, pgid int) {
 		j.closeStartReady(id)
 		err = j.cmds[id].Wait()
 		if err != nil {
-			logger.Error(err)
+			logger.Debug(err)
 		}
 
 		if j.Is(STOPPING, id) {

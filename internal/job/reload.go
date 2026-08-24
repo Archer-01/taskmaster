@@ -148,27 +148,24 @@ func (j *Job) Reload(wg *sync.WaitGroup, _done chan bool, prog *config.Program) 
 			skipedDone = false
 			go j.Restart(wg, _done, -1, 1)
 		}
-		num := 0
-		var ch chan bool
 		if numprocsChanged > 0 {
-			ch = make(chan bool, 1)
-			num = numprocsChanged
 			j.NumProcs = j._NumProcs
 			j.Resize(j._NumProcs)
-			go j.Start(wg, ch, j.NumProcs-numprocsChanged, numprocsChanged)
+			go j.Start(wg, _done, j.NumProcs-numprocsChanged, numprocsChanged)
+			skipedDone = false
 		} else if numprocsChanged < 0 {
-			ch = make(chan bool, 1)
-			num = -numprocsChanged
+			num := -numprocsChanged
+			ch := make(chan bool, 1)
 			go j.Stop(wg, ch, j.NumProcs+numprocsChanged, num)
-		}
-		if num != 0 {
-			<-ch
-		}
-		if numprocsChanged < 0 {
-			logger.Debugf("Reload: resizing job to %d", j._NumProcs)
-			j.Resize(j._NumProcs)
-			j.NumProcs = j._NumProcs
-			logger.Debug("Reload: resize done")
+			go func() {
+				<-ch
+				logger.Debugf("Reload: resizing job to %d", j._NumProcs)
+				j.Resize(j._NumProcs)
+				j.NumProcs = j._NumProcs
+				logger.Debug("Reload: resize done")
+				_done <- true
+			}()
+			skipedDone = false
 		}
 	} else if shouldStart {
 		skipedDone = false

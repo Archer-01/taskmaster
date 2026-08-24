@@ -45,6 +45,7 @@ type Job struct {
 	startReady     []chan struct{}
 	startOnce      []sync.Once
 	mustop         sync.Mutex
+	muproc         sync.Mutex
 }
 
 func normalizeExitCodes(codes []int) []int {

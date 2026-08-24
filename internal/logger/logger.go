@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/syslog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -55,9 +56,31 @@ func Init() {
 		os.Exit(1)
 	}
 
+	level := InfoLevel
+	if lvl, ok := ParseLevel(os.Getenv("LOG_LEVEL")); ok {
+		level = lvl
+	}
+
 	logger = Logger{
-		level:     InfoLevel,
+		level:     level,
 		syslogger: syslogger,
+	}
+}
+
+func ParseLevel(name string) (LogLevel, bool) {
+	switch strings.ToUpper(strings.TrimSpace(name)) {
+	case "DEBUG":
+		return DebugLevel, true
+	case "INFO":
+		return InfoLevel, true
+	case "WARN", "WARNING":
+		return WarnLevel, true
+	case "ERROR":
+		return ErrorLevel, true
+	case "CRITICAL":
+		return CriticalLevel, true
+	default:
+		return InfoLevel, false
 	}
 }
 

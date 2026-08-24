@@ -6,4 +6,4 @@ stopsignal = "INT"
 stdout_logfile = "one.log"
 autostart = true
 startsecs = 120
-numprocs = 12
+numprocs = 4

@@ -46,14 +46,18 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool, startProcId int, countPr
 	st := func(i int) {
 		defer _wg.Done()
 		logger.Debugf("Stop(): Stopping process %s", j.DisplayName(i))
-		if j.procAlive(i) {
-			logger.Infof("Stop(): Sending stop signal to process %s", j.DisplayName(i))
+		j.muproc.Lock()
+		if !j.procAlive(i) {
+			j.muproc.Unlock()
+		} else {
+			logger.Debugf("Stop(): Sending stop signal to process %s", j.DisplayName(i))
 			j.SetState(STOPPING, i)
+			j.muproc.Unlock()
 
 			err := syscall.Kill(-j.pgid[i], j.StopSignal)
 			logger.Debugf("Stop(): Sent stop signal to process %s", j.DisplayName(i))
 			if err != nil && err != syscall.ESRCH {
-				logger.Error(err)
+				logger.Debug(err)
 			}
 
 			cur := time.Now().Unix()
@@ -68,25 +72,27 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool, startProcId int, countPr
 				err = syscall.Kill(-j.pgid[i], syscall.SIGKILL)
 				logger.Debugf("Stop(): Sent SIGKILL to process %s", j.DisplayName(i))
 				if err != nil && err != syscall.ESRCH {
-					logger.Error(err)
+					logger.Debug(err)
 				}
 			}
 		}
-		logger.Infof("Stop(): Process %s stopped", j.DisplayName(i))
+		j.muproc.Lock()
+		logger.Debugf("Stop(): Process %s stopped", j.DisplayName(i))
 		j.SetPgid(i, 0)
 		j._running[i] = false
 		j.SetState(STOPPED, i)
+		j.muproc.Unlock()
 	}
 
 	if startProcId >= 0 && startProcId < j.NumProcs {
 		for i := startProcId; i < startProcId+countProcId && i < j.NumProcs; i++ {
-			logger.Infof("Stopping process %s", j.DisplayName(i))
+			logger.Debugf("Stop(): Stopping process %s", j.DisplayName(i))
 			_wg.Add(1)
 			go st(i)
 		}
 	} else {
 		for i := range j.NumProcs {
-			logger.Infof("Stopping process %s", j.DisplayName(i))
+			logger.Debugf("Stop(): Stopping process %s", j.DisplayName(i))
 			_wg.Add(1)
 			go st(i)
 		}
