@@ -1,6 +1,7 @@
 package job
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"sync"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Archer-01/taskmaster/internal/logger"
-	"github.com/Archer-01/taskmaster/internal/parser/config"
 )
 
 func (j *Job) closeStartReady(procId int) {
@@ -88,11 +88,7 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, id int, pgid int) {
 			usePgid = 0
 		}
 
-		argv := config.ParseCommand(j.Command)
-		if len(argv) == 0 {
-			argv = []string{j.Command}
-		}
-		cmd := exec.Command(argv[0], argv[1:]...)
+		cmd := exec.Command("sh", "-c", fmt.Sprintf("umask %v && %v", j.Umask, j.Command))
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: usePgid}
 		j.cmds[id] = cmd
 
@@ -213,11 +209,7 @@ func (j *Job) tryStart(procId int) error {
 	j.cmds[procId].Env = append(j.Environment, os.Environ()...)
 	j.cmds[procId].Dir = j.Dir
 
-	startMu.Lock()
-	old := syscall.Umask(parseUmask(j.Umask))
 	err = j.StartCmd(procId)
-	syscall.Umask(old)
-	startMu.Unlock()
 	if err != nil {
 		return err
 	}

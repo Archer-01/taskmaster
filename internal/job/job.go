@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -12,10 +11,6 @@ import (
 	"github.com/Archer-01/taskmaster/internal/parser/config"
 	"github.com/Archer-01/taskmaster/internal/utils"
 )
-
-// serializes umask switching around process starts, since umask is
-// process-wide and concurrent starts could inherit the wrong one
-var startMu sync.Mutex
 
 func (p *Job) StartCmd(procId int) error {
 	if err := p.cmds[procId].Start(); err != nil {
@@ -151,9 +146,4 @@ func (j *Job) setLog(file string, writer *utils.DynamicWriter, _default io.Write
 	return nil
 }
 
-func parseUmask(s string) int {
-	if v, err := strconv.ParseUint(s, 8, 32); err == nil {
-		return int(v)
-	}
-	return 0o022
-}
+
