@@ -110,6 +110,10 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool, startProcId int, countPr
 		for i := range j.NumProcs {
 			logger.Debugf("Stop(): Waiting for process %s to exit", j.DisplayName(i))
 			j.cmds[i].Wait()
+			for j._running[i] {
+				time.Sleep(100 * time.Millisecond)
+				logger.Debugf("Stop(): Waiting for process %s to finish cleanup", j.DisplayName(i))
+			}
 		}
 	}
 	return nil

@@ -57,6 +57,10 @@ func (j *Job) IsRunning() bool {
 	return false
 }
 
+func (j *Job) isRunningProc(procId int) bool {
+	return j._running[procId]
+}
+
 func (j *Job) procAlive(id int) bool {
 	return j._running[id] && j.HasPgid(id) && groupAlive(j.pgid[id])
 }
