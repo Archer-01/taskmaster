@@ -89,7 +89,7 @@ func (m *JobManager) reload() error {
 			os.Exit(1)
 		}
 
-		fmt.Println("[NOTICE] De-escalation successful")
+		logger.Info("[NOTICE] De-escalation successful")
 	}
 
 	stop := make([]chan bool, 0)
@@ -98,7 +98,7 @@ func (m *JobManager) reload() error {
 		if !fd {
 			d := make(chan bool, 1)
 			stop = append(stop, d)
-			go j.Stop(m.wg, d)
+			go j.Stop(m.wg, d, -1, 1)
 			delete(m.Jobs, name)
 		}
 	}
@@ -132,7 +132,7 @@ func (m *JobManager) reload() error {
 		start = append(start, d)
 		j := job.NewJob(nj.name, nj.prog)
 		m.Jobs[nj.name] = j
-		go j.Start(m.wg, d)
+		go j.Start(m.wg, d, -1, 1)
 	}
 
 	for _, _done := range stop {
@@ -176,7 +176,7 @@ func (m *JobManager) start() {
 		done = make(chan bool, 1)
 		defer close(done)
 		logger.Infof("[STARTING] Program(name=%s)", j.Name)
-		j.Start(m.wg, done)
+		j.Start(m.wg, done, -1, 1)
 		<-done
 	}
 }
@@ -194,23 +194,23 @@ func (m *JobManager) Run() {
 			action.Done <- true
 			return
 
-	case RELOAD:
-		logger.Warn("Reloading...")
-		if err := m.reload(); err != nil {
-			action.Data <- err.Error()
-			action.Done <- false
-		} else {
-			action.Done <- true
-		}
+		case RELOAD:
+			logger.Warn("Reloading...")
+			if err := m.reload(); err != nil {
+				action.Data <- err.Error()
+				action.Done <- false
+			} else {
+				action.Done <- true
+			}
 
 		case START:
-			m.setJobs("STARTING", (*job.Job).Start, action)
+			m.setJobs("STARTING", (*job.Job).Start, action, -1, 1)
 
 		case STOP:
-			m.setJobs("STOPPING", (*job.Job).Stop, action)
+			m.setJobs("STOPPING", (*job.Job).Stop, action, -1, 1)
 
 		case RESTART:
-			m.setJobs("RESTARTING", (*job.Job).Restart, action)
+			m.setJobs("RESTARTING", (*job.Job).Restart, action, -1, 1)
 
 		case STATUS:
 			m.getStatus(action)
@@ -222,9 +222,9 @@ func (m *JobManager) Run() {
 	}
 }
 
-func (m *JobManager) runWorkerJob(j *job.Job, worker job.WorkerFn, done chan bool, state string) {
+func (m *JobManager) runWorkerJob(j *job.Job, worker job.WorkerFn, done chan bool, state string, procId int) {
 	logger.Infof("[%s] Program(name=%s)", state, j.Name)
-	go worker(j, m.wg, done)
+	go worker(j, m.wg, done, procId, 1)
 }
 
 func (m *JobManager) runWorkerJobs(jobs []*job.Job, worker job.WorkerFn, action Action, state string) {
@@ -232,7 +232,7 @@ func (m *JobManager) runWorkerJobs(jobs []*job.Job, worker job.WorkerFn, action 
 	for _, j := range jobs {
 		_done := make(chan bool, 1)
 		jobs_done = append(jobs_done, _done)
-		m.runWorkerJob(j, worker, _done, state)
+		m.runWorkerJob(j, worker, _done, state, -1)
 	}
 	for _, _done := range jobs_done {
 		defer close(_done)
@@ -241,7 +241,7 @@ func (m *JobManager) runWorkerJobs(jobs []*job.Job, worker job.WorkerFn, action 
 	action.Done <- true
 }
 
-func (m *JobManager) setJobs(state string, worker job.WorkerFn, action Action) {
+func (m *JobManager) setJobs(state string, worker job.WorkerFn, action Action, procId int, count int) {
 	if len(action.Args) != 1 {
 		action.Data <- "command accepts 1 argument only"
 		action.Done <- false
@@ -255,7 +255,7 @@ func (m *JobManager) setJobs(state string, worker job.WorkerFn, action Action) {
 			action.Done <- false
 			return
 		}
-		m.runWorkerJob(j, worker, action.Done, state)
+		m.runWorkerJob(j, worker, action.Done, state, procId)
 	} else {
 		var sorted []*job.Job
 		if state == "STOPPING" {
@@ -324,7 +324,7 @@ func (m *JobManager) stop() {
 		done = make(chan bool, 1)
 		defer close(done)
 		logger.Infof("[STOPPING] Program(name=%s)", j.Name)
-		j.Stop(m.wg, done)
+		j.Stop(m.wg, done, -1, 1)
 		<-done
 	}
 }

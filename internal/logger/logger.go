@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/syslog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -11,7 +12,8 @@ import (
 type LogLevel uint8
 
 const (
-	InfoLevel LogLevel = iota
+	DebugLevel LogLevel = iota
+	InfoLevel
 	WarnLevel
 	ErrorLevel
 	CriticalLevel
@@ -19,6 +21,8 @@ const (
 
 func (lvl LogLevel) String() string {
 	switch lvl {
+	case DebugLevel:
+		return "DBUG"
 	case InfoLevel:
 		return "INFO"
 	case WarnLevel:
@@ -52,14 +56,50 @@ func Init() {
 		os.Exit(1)
 	}
 
+	level := InfoLevel
+	if lvl, ok := ParseLevel(os.Getenv("LOG_LEVEL")); ok {
+		level = lvl
+	}
+
 	logger = Logger{
-		level:     InfoLevel,
+		level:     level,
 		syslogger: syslogger,
+	}
+}
+
+func ParseLevel(name string) (LogLevel, bool) {
+	switch strings.ToUpper(strings.TrimSpace(name)) {
+	case "DEBUG":
+		return DebugLevel, true
+	case "INFO":
+		return InfoLevel, true
+	case "WARN", "WARNING":
+		return WarnLevel, true
+	case "ERROR":
+		return ErrorLevel, true
+	case "CRITICAL":
+		return CriticalLevel, true
+	default:
+		return InfoLevel, false
 	}
 }
 
 func SetLevel(level LogLevel) {
 	logger.level = level
+}
+
+func Debug(a any) {
+	logger.log(DebugLevel, a)
+
+	message := fmt.Sprintf("%v", a)
+	logger.syslogger.Debug(message)
+}
+
+func Debugf(format string, a ...any) {
+	message := fmt.Sprintf(format, a...)
+	logger.log(DebugLevel, message)
+
+	logger.syslogger.Debug(message)
 }
 
 func Info(a any) {
