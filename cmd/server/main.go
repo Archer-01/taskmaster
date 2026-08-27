@@ -12,12 +12,14 @@ import (
 )
 
 func main() {
-	logger.Init()
-
 	setup, err := utils.ParseSetupFile()
 	if err != nil {
-		logger.Critical(err)
+		fmt.Fprintf(os.Stderr, "ERROR: Cannot read %s: %v\n", utils.CONF, err)
+		os.Exit(1)
 	}
+
+	logger.Init(setup.LogFile)
+	defer logger.Close()
 
 	if setup.Socket == "" {
 		setup.Socket = fmt.Sprintf("/tmp/taskmasterd-%d.sock", os.Getpid())
