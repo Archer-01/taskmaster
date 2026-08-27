@@ -71,6 +71,9 @@ func (j *Job) Start(wg *sync.WaitGroup, _done chan bool, procId int, count int) 
 
 func (j *Job) startJobWorker(wg *sync.WaitGroup, id int, pgid int) {
 	wg.Add(1)
+	defer func() {
+		j._running[id] = false
+	}()
 	defer wg.Done()
 	defer j.closeStartReady(id)
 
@@ -185,7 +188,6 @@ func (j *Job) startJobWorker(wg *sync.WaitGroup, id int, pgid int) {
 	} else if j.Is(STOPPING, id) {
 		j.SetState(STOPPED, id)
 	}
-	j._running[id] = false
 }
 
 func (j *Job) tryStart(procId int) error {

@@ -46,14 +46,18 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool, startProcId int, countPr
 	st := func(i int) {
 		defer _wg.Done()
 		logger.Debugf("Stop(): Stopping process %s", j.DisplayName(i))
-		// j.muproc.Lock()
-		if !j.procAlive(i) {
-			// j.muproc.Unlock()
-		} else {
-			logger.Debugf("Stop(): Sending stop signal to process %s", j.DisplayName(i))
-			j.SetState(STOPPING, i)
-			// j.muproc.Unlock()
+		if !j._running[i] {
+			// Worker inactive, nothing left to signal or wait for.
+			j.SetPgid(i, 0)
+			j.SetState(STOPPED, i)
+			return
+		}
 
+		// Keep STOPPING set (don't move to STOPPED here) so the worker observes it and terminates.
+		j.SetState(STOPPING, i)
+
+		if j.procAlive(i) {
+			logger.Debugf("Stop(): Sending stop signal to process %s", j.DisplayName(i))
 			err := syscall.Kill(-j.pgid[i], j.StopSignal)
 			logger.Debugf("Stop(): Sent stop signal to process %s", j.DisplayName(i))
 			if err != nil && err != syscall.ESRCH {
@@ -76,12 +80,7 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool, startProcId int, countPr
 				}
 			}
 		}
-		// j.muproc.Lock()
-		logger.Debugf("Stop(): Process %s stopped", j.DisplayName(i))
 		j.SetPgid(i, 0)
-		j._running[i] = false
-		j.SetState(STOPPED, i)
-		// j.muproc.Unlock()
 	}
 
 	if startProcId >= 0 && startProcId < j.NumProcs {
@@ -101,20 +100,32 @@ func (j *Job) Stop(wg *sync.WaitGroup, _done chan bool, startProcId int, countPr
 
 	if startProcId >= 0 && startProcId < j.NumProcs {
 		for i := startProcId; i < startProcId+countProcId && i < j.NumProcs; i++ {
-			logger.Debugf("Stop(): Waiting for process %s to exit", j.DisplayName(i))
-			j.cmds[i].Wait()
-			logger.Debugf("Stop(): Process %s exited", j.DisplayName(i))
+			// Don't call cmds[i].Wait() (double Wait deadlocks); wait for the worker and re-kill its current group until it exits.
+			for j._running[i] {
+				j.sigkillProc(i)
+				time.Sleep(100 * time.Millisecond)
+				logger.Debugf("Stop(): Waiting for process %s to finish cleanup", j.DisplayName(i))
+			}
 		}
 	} else {
 		logger.Debugf("Stop(): Waiting for all processes of job %s to exit", j.Name)
 		for i := range j.NumProcs {
-			logger.Debugf("Stop(): Waiting for process %s to exit", j.DisplayName(i))
-			j.cmds[i].Wait()
 			for j._running[i] {
+				j.sigkillProc(i)
 				time.Sleep(100 * time.Millisecond)
 				logger.Debugf("Stop(): Waiting for process %s to finish cleanup", j.DisplayName(i))
 			}
 		}
 	}
 	return nil
+}
+
+func (j *Job) sigkillProc(i int) {
+	pgid := j.pgid[i]
+	if pgid == 0 {
+		return
+	}
+	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
+		logger.Debug(err)
+	}
 }
