@@ -1,1 +1,2 @@
 prompt = "taskmaster> "
+logfile = "/log/taskmaster.log"

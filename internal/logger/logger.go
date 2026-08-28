@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/syslog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -40,11 +41,12 @@ type Logger struct {
 	level     LogLevel
 	mutex     sync.Mutex
 	syslogger *syslog.Writer
+	file      *os.File
 }
 
 var logger Logger
 
-func Init() {
+func Init(logfile string) {
 	syslogger, err := syslog.New(syslog.LOG_INFO, "taskmaster")
 
 	if err != nil {
@@ -61,9 +63,38 @@ func Init() {
 		level = lvl
 	}
 
+	var file *os.File
+
+	if logfile != "" {
+		if dir := filepath.Dir(logfile); dir != "." {
+			if err := os.Mkdir(dir, 0755); err != nil {
+				fmt.Fprintf(os.Stderr, "ERROR: CAnnot create logfile directory %q: %v\n", dir, err)
+				os.Exit(1)
+			}
+		}
+
+		file, err = os.OpenFile(logfile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: Cannot open logfile %q: %v\n", logfile, err)
+			os.Exit(1)
+		}
+	}
+
 	logger = Logger{
 		level:     level,
 		syslogger: syslogger,
+		file:      file,
+	}
+}
+
+func Close() {
+	logger.mutex.Lock()
+	defer logger.mutex.Unlock()
+
+	if logger.file != nil {
+		logger.file.Close()
+		logger.file = nil
 	}
 }
 
@@ -170,4 +201,8 @@ func (l *Logger) log(level LogLevel, a any) {
 	defer l.mutex.Unlock()
 
 	fmt.Println(message)
+
+	if l.file != nil {
+		fmt.Fprintln(l.file, message)
+	}
 }
